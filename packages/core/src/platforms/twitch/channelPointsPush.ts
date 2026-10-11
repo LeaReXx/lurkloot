@@ -38,8 +38,11 @@ export interface TwitchHermesOwners {
   // The watched channel's playback topic (#759).
   playback?: { channelId: string; onNotice: (notice: TwitchPlaybackNotice) => void };
   // A Twitch Extension's broadcast topic on the watched channel (#757). Only
-  // the message's event name is passed on, never its payload.
-  extensionBroadcast?: { channelId: string; extensionId: string; onEvent: (event: string) => void };
+  // the message's event name is passed on, never its payload. Hermes accepts
+  // the topic only as an `extension` subscription carrying the extension's own
+  // JWT for that channel, as Twitch's web client sends it; the user's token
+  // alone is refused.
+  extensionBroadcast?: { channelId: string; extensionId: string; token: string; onEvent: (event: string) => void };
 }
 
 export interface TwitchChannelPointsPushDeps {
@@ -117,7 +120,9 @@ export class TwitchChannelPointsPushController {
   async start(owners: TwitchHermesOwners | ((notice: TwitchChannelPointsClaimNotice) => void)): Promise<void> {
     const next = typeof owners === "function" ? { onClaimAvailable: owners } : owners;
     if (next.playback?.channelId !== this.owners.playback?.channelId
-      || extensionBroadcastTopic(next) !== extensionBroadcastTopic(this.owners)) this.refusedTopics.clear();
+      || extensionBroadcastTopic(next) !== extensionBroadcastTopic(this.owners)
+      // A renewed extension JWT may be accepted where an expired one was not.
+      || next.extensionBroadcast?.token !== this.owners.extensionBroadcast?.token) this.refusedTopics.clear();
     this.owners = next;
     if (!this.stopped) {
       if (this.ws && this.authenticated) this.syncTopics(this.ws);
@@ -237,6 +242,9 @@ export class TwitchChannelPointsPushController {
       case "notification":
         this.handleNotification(frame);
         return;
+      case "subscriptionRevocation":
+        this.handleRevocation(ws, frame);
+        return;
       default:
         this.log("debug", "Ignored Twitch channel-points push frame");
         return;
@@ -316,7 +324,9 @@ export class TwitchChannelPointsPushController {
       this.safeSend(ws, {
         type: "subscribe",
         id: subscription.frameId,
-        subscribe: { id: subscription.id, type: "pubsub", pubsub: { topic } },
+        subscribe: topic.startsWith(TWITCH_EXTENSION_BROADCAST_TOPIC_PREFIX) && this.owners.extensionBroadcast
+          ? { id: subscription.id, type: "extension", extension: { topic, token: this.owners.extensionBroadcast.token } }
+          : { id: subscription.id, type: "pubsub", pubsub: { topic } },
         timestamp: new Date().toISOString(),
       });
     }
@@ -348,9 +358,11 @@ export class TwitchChannelPointsPushController {
         // work to the periodic checks and keeps the claims topic up.
         this.subscriptions.delete(subscription.topic);
         this.refusedTopics.add(subscription.topic);
+        const code = isRecord(response) && typeof response.errorCode === "string" && /^[A-Z0-9_]{1,16}$/.test(response.errorCode)
+          ? ` (${response.errorCode})` : "";
         this.log("debug", subscription.topic.startsWith(TWITCH_PLAYBACK_TOPIC_PREFIX)
-          ? "Twitch playback push subscribe was not ok"
-          : "Twitch Extension broadcast subscribe was not ok");
+          ? `Twitch playback push subscribe was not ok${code}`
+          : `Twitch Extension broadcast subscribe was not ok${code}`);
         return;
       }
       this.log("debug", "Twitch channel-points push subscribe was not ok");
@@ -367,6 +379,18 @@ export class TwitchChannelPointsPushController {
     } else {
       this.log("debug", `Twitch channel-points push subscribed to ${subscription.topic}`);
     }
+  }
+
+  // Hermes revokes a subscription it no longer honours, such as an extension
+  // topic whose JWT expired. Subscribe it again with the owners' current state.
+  private handleRevocation(ws: WebSocketLike, frame: HermesFrame): void {
+    const revocation = frame.subscriptionRevocation;
+    const id = isRecord(revocation) && isRecord(revocation.subscription) ? revocation.subscription.id : undefined;
+    const subscription = [...this.subscriptions.values()].find((candidate) => candidate.id === id);
+    if (!subscription) return;
+    this.subscriptions.delete(subscription.topic);
+    this.log("debug", `Hermes revoked the subscription to ${subscription.topic}`);
+    if (this.authenticated) this.syncTopics(ws);
   }
 
   private handleNotification(frame: HermesFrame): void {
@@ -531,6 +555,7 @@ interface HermesFrame {
   authenticateResponse?: unknown;
   subscribeResponse?: unknown;
   notification?: unknown;
+  subscriptionRevocation?: unknown;
 }
 
 function parseFrame(value: unknown): HermesFrame | undefined {
@@ -545,6 +570,7 @@ function parseFrame(value: unknown): HermesFrame | undefined {
       authenticateResponse: parsed.authenticateResponse,
       subscribeResponse: parsed.subscribeResponse,
       notification: parsed.notification,
+      subscriptionRevocation: parsed.subscriptionRevocation,
     };
   } catch {
     return undefined;
@@ -561,7 +587,7 @@ function readKeepaliveSec(welcome: unknown): number {
 
 function extensionBroadcastTopic(owners: TwitchHermesOwners): string | undefined {
   const broadcast = owners.extensionBroadcast;
-  if (!broadcast || !/^\d{1,20}$/.test(broadcast.channelId) || !/^[a-z0-9]{1,64}$/.test(broadcast.extensionId)) return undefined;
+  if (!broadcast?.token || !/^\d{1,20}$/.test(broadcast.channelId) || !/^[a-z0-9]{1,64}$/.test(broadcast.extensionId)) return undefined;
   return `${TWITCH_EXTENSION_BROADCAST_TOPIC_PREFIX}${broadcast.channelId}-${broadcast.extensionId}-broadcast`;
 }
 
