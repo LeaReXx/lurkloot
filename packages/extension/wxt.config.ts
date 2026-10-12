@@ -5,8 +5,10 @@ import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { KASADA_COOKIE_ORIGIN } from "./src/core/cliCredentialExport";
 import {
+  KICK_HOST_ORIGIN,
   PLATFORM_IVS_ORIGIN,
   TWITCH_EXTENSION_HOST_ORIGIN,
+  TWITCH_HOST_ORIGIN,
   TWITCH_STATIC_CDN_ORIGIN,
 } from "./src/core/platformHosts";
 import { TWITCH_HLS_HOST_ORIGIN } from "./src/core/twitchHlsPermission";
@@ -53,8 +55,8 @@ export default defineConfig({
     // *.twitch.tv / *.kick.com and are granted now so a later farming path
     // does not need another privilege escalation.
     host_permissions: [
-      "https://*.twitch.tv/*",
-      "https://*.kick.com/*",
+      TWITCH_HOST_ORIGIN,
+      KICK_HOST_ORIGIN,
       TWITCH_HLS_HOST_ORIGIN,
       TWITCH_STATIC_CDN_ORIGIN,
       PLATFORM_IVS_ORIGIN,
@@ -69,7 +71,7 @@ export default defineConfig({
     web_accessible_resources: [
       {
         resources: ["inpagePanel.html"],
-        matches: ["https://*.twitch.tv/*", "https://*.kick.com/*"]
+        matches: [TWITCH_HOST_ORIGIN, KICK_HOST_ORIGIN],
       }
     ],
     icons: {
