@@ -656,13 +656,6 @@ export function Popup({ adapter, initialState }: { adapter: PopupAdapter; initia
         adapter.exportCredentials?.(blob);
       }
     : undefined;
-  // The optional Kasada cookie host is requested when the export is armed, not
-  // on confirm: Chrome's permission prompt can destroy the popup, and the
-  // download runs here. A declined grant still exports the login cookies.
-  const armExportCredentials = exportCredentials && adapter.requestCredentialExportPermission
-    ? () => { void adapter.requestCredentialExportPermission?.().catch(() => false); }
-    : undefined;
-
   const resetExtension = adapter.resetExtension
     ? async () => {
         await settingsSaveQueue.current.catch(() => undefined);
@@ -976,7 +969,7 @@ export function Popup({ adapter, initialState }: { adapter: PopupAdapter; initia
                   ) : null}
                 </AnimatePresence>
                 {view === "settings" ? (
-                  <SettingsView suggestions={dropCategorySuggestions} onSearchCategories={searchCategories} settings={settings} onSettingsChange={updateSettings} onExtensionEnabledChange={adapter.requestTwitchExtensionPermission ? setExtensionEnabled : undefined} onExportCredentials={exportCredentials} onArmExportCredentials={armExportCredentials} onExportSettings={exportSettings} onImportSettings={importSettings} onReset={resetExtension} exportConfirmationResetKey={settingsOpenGeneration} compatibilityRegistry={adapter.compatibilityRegistry} compatibilityResolution={compatibilityResolution} onOpenGames={(gamesPlatform) => { if (gamesPlatform !== platform) selectPlatform(gamesPlatform); changeView("games"); }} version={adapter.version} focusGroupId={preview && variantShowsPopup(initialVariant) && initialVariant.view === "settings" ? "general.drops" : settingsFocus} />
+                  <SettingsView suggestions={dropCategorySuggestions} onSearchCategories={searchCategories} settings={settings} onSettingsChange={updateSettings} onExtensionEnabledChange={adapter.requestTwitchExtensionPermission ? setExtensionEnabled : undefined} onExportCredentials={exportCredentials} onExportSettings={exportSettings} onImportSettings={importSettings} onReset={resetExtension} exportConfirmationResetKey={settingsOpenGeneration} compatibilityRegistry={adapter.compatibilityRegistry} compatibilityResolution={compatibilityResolution} onOpenGames={(gamesPlatform) => { if (gamesPlatform !== platform) selectPlatform(gamesPlatform); changeView("games"); }} version={adapter.version} focusGroupId={preview && variantShowsPopup(initialVariant) && initialVariant.view === "settings" ? "general.drops" : settingsFocus} />
                 ) : view === "activity" ? (
                   <ActivityLog
                     activityEvents={activityStream.events}

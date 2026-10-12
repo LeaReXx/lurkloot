@@ -35,7 +35,7 @@ import { createTwitchExtensionSessionSource } from "../src/extensions/transport"
 import { createFortniteDriver } from "../src/extensions/fortnite/driver";
 import { createNoPixelDriver } from "../src/extensions/nopixel/driver";
 import { createCredentialHealthObserver } from "../src/core/credentialObserver";
-import { buildCliCredentialBlob, KASADA_COOKIE_ORIGIN } from "../src/core/cliCredentialExport";
+import { buildCliCredentialBlob } from "../src/core/cliCredentialExport";
 import { REQUEST_FAILED_RESPONSE } from "../src/core/runtimeRequests";
 
 interface ChromeOffscreen {
@@ -355,7 +355,6 @@ const dispatchRuntimeMessage = createRuntimeMessageDispatcher({
         return undefined;
       }
     },
-    () => browser.permissions.contains({ origins: [KASADA_COOKIE_ORIGIN] }),
   ),
   resetExtension,
   handleActivityMessage,

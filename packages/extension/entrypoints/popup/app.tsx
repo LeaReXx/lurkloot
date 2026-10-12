@@ -1,5 +1,4 @@
 import { requestTwitchExtensionGrant } from "../../src/extensions/grantCompletion";
-import { KASADA_COOKIE_ORIGIN } from "../../src/core/cliCredentialExport";
 import { createRuntimeRequestSender } from "../../src/core/runtimeRequests";
 import { browser } from "wxt/browser";
 import type React from "react";
@@ -53,7 +52,6 @@ export function createExtensionPopupAdapter(): PopupAdapter {
     getPendingChangelogVersion: loadPendingChangelogVersion,
     dismissPendingChangelogVersion,
     changelogUrl,
-    requestCredentialExportPermission: () => browser.permissions.request({ origins: [KASADA_COOKIE_ORIGIN] }),
     exportCredentials: (blob) => {
       // Download the credential blob the CLI's `login --import` consumes. The
       // popup is a normal extension page, so a Blob URL + anchor works without
