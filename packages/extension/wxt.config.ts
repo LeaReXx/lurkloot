@@ -4,6 +4,13 @@ import { basename, dirname, join } from "node:path";
 import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 import { KASADA_COOKIE_ORIGIN } from "./src/core/cliCredentialExport";
+import {
+  KICK_HOST_ORIGIN,
+  PLATFORM_IVS_ORIGIN,
+  TWITCH_EXTENSION_HOST_ORIGIN,
+  TWITCH_HOST_ORIGIN,
+  TWITCH_STATIC_CDN_ORIGIN,
+} from "./src/core/platformHosts";
 import { TWITCH_HLS_HOST_ORIGIN } from "./src/core/twitchHlsPermission";
 import { applyProviderOptionalPermissions } from "./src/extensions/manifest";
 
@@ -44,10 +51,16 @@ export default defineConfig({
     // Kasada is requested by the CLI credential export.
     optional_host_permissions: [KASADA_COOKIE_ORIGIN],
     // Twitch's video CDN carries the HLS watch heartbeat, the default.
+    // The static CDN, Amazon IVS, and Twitch Extensions hosts sit outside
+    // *.twitch.tv / *.kick.com and are granted now so a later farming path
+    // does not need another privilege escalation.
     host_permissions: [
-      "https://*.twitch.tv/*",
-      "https://*.kick.com/*",
-      TWITCH_HLS_HOST_ORIGIN
+      TWITCH_HOST_ORIGIN,
+      KICK_HOST_ORIGIN,
+      TWITCH_HLS_HOST_ORIGIN,
+      TWITCH_STATIC_CDN_ORIGIN,
+      PLATFORM_IVS_ORIGIN,
+      TWITCH_EXTENSION_HOST_ORIGIN,
     ],
     // The in-page panel is an extension page the twitch/kick content scripts
     // embed in an iframe, so its document must be web-accessible. Scoped to the
@@ -58,7 +71,7 @@ export default defineConfig({
     web_accessible_resources: [
       {
         resources: ["inpagePanel.html"],
-        matches: ["https://*.twitch.tv/*", "https://*.kick.com/*"]
+        matches: [TWITCH_HOST_ORIGIN, KICK_HOST_ORIGIN],
       }
     ],
     icons: {
