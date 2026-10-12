@@ -105,7 +105,7 @@ Do not add features that store credentials, export cookies, or bypass platform d
 The headless CLI is the one deliberate exception, kept as narrow as possible (#653). Since September 2026 Twitch accepts device login only from clients that cannot see the campaign list, so full CLI discovery needs the web client and a Kasada integrity token:
 
 - The CLI may keep its own device-login and imported credentials in its private auth store.
-- The extension's Settings → Export credentials, a user-confirmed action, may export the Twitch and Kick login cookies plus Twitch's Kasada session cookie (`KP_UIDz-ssn`). It reads that cookie through the optional `https://k.twitchcdn.net/*` permission, requested only by the export, never as a required permission.
+- The extension's Settings → Export credentials, a user-confirmed action, may export the Twitch and Kick login cookies plus Twitch's Kasada session cookie (`KP_UIDz-ssn`). It reads that cookie from `k.twitchcdn.net`, covered by the required `https://*.twitchcdn.net/*` host permission.
 - The CLI may mint Twitch web Client-Integrity from that cookie without a browser.
 
 Nothing else may export cookies or evade detection, and the extension itself never uses the Kasada cookie while farming.

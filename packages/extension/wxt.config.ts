@@ -3,10 +3,10 @@ import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
-import { KASADA_COOKIE_ORIGIN } from "./src/core/cliCredentialExport";
 import {
   KICK_HOST_ORIGIN,
   PLATFORM_IVS_ORIGIN,
+  TWITCH_CDN_ORIGIN,
   TWITCH_EXTENSION_HOST_ORIGIN,
   TWITCH_HOST_ORIGIN,
   TWITCH_STATIC_CDN_ORIGIN,
@@ -48,17 +48,18 @@ export default defineConfig({
     // offscreen (Chrome only, no install warning): the hidden kick.com frame
     // that opens Kick's realtime chat sockets (#754, kickRealtimeRelay.ts).
     permissions: ["alarms", "storage", "tabs", "scripting", "notifications", "cookies", "webRequest", ...(browser === "firefox" ? [] : ["offscreen"])],
-    // Kasada is requested by the CLI credential export.
-    optional_host_permissions: [KASADA_COOKIE_ORIGIN],
+    // Optional hosts come only from opted-in Twitch Extension providers
+    // (applyProviderOptionalPermissions). Twitch CDN / Kasada is required.
     // Twitch's video CDN carries the HLS watch heartbeat, the default.
-    // The static CDN, Amazon IVS, and Twitch Extensions hosts sit outside
-    // *.twitch.tv / *.kick.com and are granted now so a later farming path
-    // does not need another privilege escalation.
+    // The static CDN, Twitch CDN (Kasada), Amazon IVS, and Twitch Extensions
+    // hosts sit outside *.twitch.tv / *.kick.com and are granted now so a
+    // later farming path does not need another privilege escalation.
     host_permissions: [
       TWITCH_HOST_ORIGIN,
       KICK_HOST_ORIGIN,
       TWITCH_HLS_HOST_ORIGIN,
       TWITCH_STATIC_CDN_ORIGIN,
+      TWITCH_CDN_ORIGIN,
       PLATFORM_IVS_ORIGIN,
       TWITCH_EXTENSION_HOST_ORIGIN,
     ],

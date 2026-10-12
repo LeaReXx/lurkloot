@@ -12,6 +12,12 @@ export const KICK_HOST_ORIGIN = "https://*.kick.com/*";
 export const TWITCH_STATIC_CDN_ORIGIN = "https://*.jtvnw.net/*";
 
 /**
+ * Twitch CDN used by Kasada (`k.twitchcdn.net`) and related first-party
+ * services. Covers the CLI credential export's `KP_UIDz-ssn` cookie read.
+ */
+export const TWITCH_CDN_ORIGIN = "https://*.twitchcdn.net/*";
+
+/**
  * Amazon IVS. Kick delivers livestream playlists on nested
  * `*.playback.live-video.net` hosts; Twitch's web player also contacts
  * `*.live-video.net` for IVS device configuration.
