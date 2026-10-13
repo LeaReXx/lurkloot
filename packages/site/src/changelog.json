@@ -55,7 +55,8 @@
         "kind": "fixed",
         "text": "Idle Watchlist channels now keep being watched without a tab on Kick and Twitch when no drop campaign is running, including after the browser puts Lurkloot to sleep. On Kick, a channel could show as watched while Kick wasn't counting it, so your channel level didn't go up."
       }
-    ]
+    ],
+    "date": "2026-10-09"
   },
   {
     "version": "1.15.0",
