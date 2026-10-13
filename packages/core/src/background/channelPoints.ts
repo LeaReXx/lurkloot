@@ -1,9 +1,10 @@
 import type { ChannelCandidate, EngineSettings, SchedulerState } from "@lurkloot/shared/models";
 import type { EventEmitter } from "@lurkloot/shared/events";
 import { autoClaimChannelPointsFor } from "@lurkloot/shared/settings";
+import { twitchExtensionProvider } from "../extensions/registry";
 import { pausedForManualWatch, recentManualWatch } from "../core/manualWatch";
 import type { PlatformAdapter } from "../platforms/adapter";
-import type { TwitchChannelPointsClaimNotice, TwitchChannelPointsPushController } from "../platforms/twitch/channelPointsPush";
+import type { TwitchChannelPointsClaimNotice, TwitchChannelPointsPushController, TwitchPlaybackNotice } from "../platforms/twitch/channelPointsPush";
 import { TWITCH_CHANNEL_POINTS_ALARM_NAME } from "./constants";
 import { type ControllerSlices, lateBound } from "./context";
 import { emitHostCallbackError } from "./helpers";
@@ -13,6 +14,7 @@ import type { BackgroundJob } from "./jobs";
 import { ObserverSlot } from "./observerSlot";
 import type { TickEffectExecutor } from "./tickEffects";
 import type { ControllerCalls } from "./types";
+import { errorMessage } from "@lurkloot/shared/errors";
 
 function eligibleTwitchChannelPointsChannel(
   settings: EngineSettings,
@@ -24,6 +26,34 @@ function eligibleTwitchChannelPointsChannel(
   }
   const session = state.sessions.twitch;
   return session.status === "watching" ? session.channel : undefined;
+}
+
+// How long after a stream-down push the watched channel is checked (#759).
+// Twitch's own stream query still reports a just-ended stream as live for
+// several seconds, and a quick restart sends stream-up within the minute.
+export const TWITCH_STREAM_DOWN_CHECK_DELAY_MS = 60_000;
+
+// The channel LurkLoot itself is watching on Twitch, whose playback topic the
+// Hermes connection follows. Not during a manual watch: LurkLoot is not
+// watching then.
+function watchedTwitchChannelId(settings: EngineSettings, state: SchedulerState, now = Date.now()): string | undefined {
+  if (!settings.platform.twitch.enabled || state.authHealth.twitch.status !== "healthy") return undefined;
+  if (pausedForManualWatch(settings, state, "twitch", now)) return undefined;
+  const session = state.sessions.twitch;
+  const channelId = session.status === "watching" ? session.channel?.channelId : undefined;
+  // Only a real Twitch id names a playback topic.
+  return channelId && /^\d{1,20}$/.test(channelId) ? channelId : undefined;
+}
+
+// The watching Twitch Extension provider whose Hermes broadcast topic says
+// when to refresh it (#757), on the channel LurkLoot itself watches.
+function watchedExtensionBroadcast(settings: EngineSettings, state: SchedulerState, now = Date.now()) {
+  const channelId = watchedTwitchChannelId(settings, state, now);
+  const session = state.sessions.twitch;
+  const provider = session.watchMode === "tabless" && session.supplementalWatch
+    ? twitchExtensionProvider(session.supplementalWatch.id) : undefined;
+  if (!channelId || !provider?.broadcastRefreshEvents?.length) return undefined;
+  return { channelId, provider };
 }
 
 // One channel-points claim request at a time, whether the tick, the one-minute
@@ -90,6 +120,7 @@ export function createChannelPoints<S extends EngineSettings>(
     | "reportBestEffort"
     | "withEventCollector"
     | "trackBackgroundWork"
+    | "tickInBackground"
   >,
 ): Pick<ControllerCalls<S>,
   | "abortTwitchChannelPointsClaims"
@@ -103,10 +134,17 @@ export function createChannelPoints<S extends EngineSettings>(
   | "registerTwitchChannelPointsEffects"
   | "runTwitchChannelPointsClaim"
 > {
-  const { createAdapter, diagnosticEvent, reportBestEffort, withEventCollector, trackBackgroundWork } = lateBound(calls);
-  // The push observer. A failed start stops and clears it, so the next
+  const { createAdapter, diagnosticEvent, reportBestEffort, withEventCollector, trackBackgroundWork, tickInBackground } = lateBound(calls);
+  // The Hermes observer: the channel-points topic and, since #759, the watched
+  // channel's playback topic. A failed start stops and clears it, so the next
   // reconcile creates a fresh one.
   const push = new ObserverSlot<TwitchChannelPointsPushController>("twitch", "Twitch channel-points observer", "discard");
+  // The check a stream-down push scheduled; a stream-up or a stop cancels it.
+  let streamDownCheck: { timer: ReturnType<typeof setTimeout>; channelId: string } | undefined;
+  function cancelStreamDownCheck(): void {
+    if (streamDownCheck !== undefined) clearTimeout(streamDownCheck.timer);
+    streamDownCheck = undefined;
+  }
   const claims = new ChannelPointsClaimGate();
   // Push notices whose claim is queued or running, so a repeated notice
   // coalesces into the claim already on its way.
@@ -208,6 +246,7 @@ export function createChannelPoints<S extends EngineSettings>(
   // Kept under this name: auth transitions still call it under their lock
   // until #595 gives them after-commit hooks.
   async function stopTwitchChannelPointsPush(emit: EventEmitter): Promise<void> {
+    cancelStreamDownCheck();
     await push.stop(emit);
   }
 
@@ -222,7 +261,7 @@ export function createChannelPoints<S extends EngineSettings>(
     const run = stopTwitchChannelPointsPushAndReport().catch((error) => {
       diagnosticEvent(
         "warn",
-        `Twitch channel-points observer cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Twitch channel-points observer cleanup failed: ${errorMessage(error)}`,
         "twitch",
       );
     });
@@ -233,7 +272,7 @@ export function createChannelPoints<S extends EngineSettings>(
     const run = reconcileTwitchChannelPointsPushFromSettings(settings).catch((error) => {
       diagnosticEvent(
         "warn",
-        `Twitch channel-points observer reconcile failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Twitch channel-points observer reconcile failed: ${errorMessage(error)}`,
         "twitch",
       );
     });
@@ -246,10 +285,30 @@ export function createChannelPoints<S extends EngineSettings>(
       && settings.platform.twitch.channelPointsPushClaim;
   }
 
-  function pushWanted(settings: EngineSettings, state: SchedulerState): boolean {
+  function claimsWanted(settings: EngineSettings, state: SchedulerState): boolean {
     return pushSettingsAllow(settings)
       && state.authHealth.twitch.status === "healthy"
       && Boolean(eligibleTwitchChannelPointsChannel(settings, state));
+  }
+
+  function pushWanted(settings: EngineSettings, state: SchedulerState): boolean {
+    return claimsWanted(settings, state) || watchedTwitchChannelId(settings, state) !== undefined;
+  }
+
+  // A stream-down for the watched channel checks it once the stream query has
+  // caught up; the tick then ends the watch on one offline check, since the
+  // push agrees (ChannelCheck.offlineConfirmed). A stream-up cancels it.
+  function handlePlaybackNotice(controller: TwitchChannelPointsPushController, notice: TwitchPlaybackNotice): void {
+    if (push.current !== controller || lifecycleSlice.controllerShutdown) return;
+    cancelStreamDownCheck();
+    if (notice.type !== "stream-down") return;
+    diagnosticEvent("debug", `Twitch reported the watched stream ended; checking it in ${TWITCH_STREAM_DOWN_CHECK_DELAY_MS / 1000} s`, "twitch");
+    const timer = setTimeout(() => {
+      streamDownCheck = undefined;
+      if (push.current !== controller || lifecycleSlice.controllerShutdown) return;
+      tickInBackground(["twitch"], "stream_offline");
+    }, TWITCH_STREAM_DOWN_CHECK_DELAY_MS);
+    streamDownCheck = { timer, channelId: notice.channelId };
   }
 
   // Starts or stops the push for `state`. `since` is the slot's epoch read
@@ -261,15 +320,43 @@ export function createChannelPoints<S extends EngineSettings>(
     emit: EventEmitter,
     since: number,
   ): Promise<void> {
+    const claims = claimsWanted(settings, state);
+    const channelId = watchedTwitchChannelId(settings, state);
+    const sources = ports.twitch.supplementalSources;
+    const watched = sources?.refreshNow ? watchedExtensionBroadcast(settings, state) : undefined;
+    const token = watched ? sources?.broadcastToken?.(watched.provider.id, watched.channelId) : undefined;
+    const broadcast = watched && token ? { ...watched, token } : undefined;
+    // A playback check pending for a channel no longer watched is moot.
+    if (streamDownCheck && streamDownCheck.channelId !== channelId) cancelStreamDownCheck();
     await push.reconcile({
-      wanted: pushWanted(settings, state),
+      wanted: claims || channelId !== undefined,
       factory: adapter.createChannelPointsPushController,
       open: observersOpen,
       since,
       emit,
-      start: (controller) => controller.start((notice) => {
-        if (push.current !== controller) return;
-        queueTwitchChannelPointsPushClaim(notice);
+      start: (controller) => controller.start({
+        ...(claims ? {
+          onClaimAvailable: (notice: TwitchChannelPointsClaimNotice) => {
+            if (push.current !== controller) return;
+            queueTwitchChannelPointsPushClaim(notice);
+          },
+        } : {}),
+        ...(channelId !== undefined ? {
+          playback: { channelId, onNotice: (notice: TwitchPlaybackNotice) => handlePlaybackNotice(controller, notice) },
+        } : {}),
+        ...(broadcast ? {
+          extensionBroadcast: {
+            channelId: broadcast.channelId,
+            extensionId: broadcast.provider.extensionId,
+            token: broadcast.token,
+            onEvent: (event: string) => {
+              if (push.current !== controller || lifecycleSlice.controllerShutdown) return;
+              if (!broadcast.provider.broadcastRefreshEvents?.includes(event)) return;
+              diagnosticEvent("debug", `${broadcast.provider.id} announced ${event} on its Twitch broadcast; refreshing it now`, "twitch");
+              ports.twitch.supplementalSources?.refreshNow?.(broadcast.provider.id, broadcast.channelId);
+            },
+          },
+        } : {}),
       }),
     });
   }
@@ -308,7 +395,7 @@ export function createChannelPoints<S extends EngineSettings>(
     } catch (error) {
       diagnosticEvent(
         "warn",
-        `Twitch channel-points observer reconcile failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Twitch channel-points observer reconcile failed: ${errorMessage(error)}`,
         "twitch",
       );
     }
@@ -318,7 +405,7 @@ export function createChannelPoints<S extends EngineSettings>(
     await withEventCollector(async (emit, events) => {
       let adapter: PlatformAdapter | undefined;
       try {
-        if (!observersOpen() || !pushSettingsAllow(settings)) {
+        if (!observersOpen() || !settings.platform.twitch.enabled) {
           await stopTwitchChannelPointsPush(emit);
           return;
         }

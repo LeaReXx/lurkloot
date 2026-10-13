@@ -26,8 +26,9 @@ function setup() {
   const report = vi.fn();
   const violation = vi.fn();
   const publish = vi.fn();
-  const runtime = createTwitchExtensionRuntime({ source: { query, hasSession: async () => true, now: () => now }, contains, drivers: { nopixel: driver }, report, onViolation: violation, publish });
-  return { runtime, driver, query, stop, refresh, contains, report, violation, publish, advance(ms: number) { now += ms; } };
+  const onSessionReady = vi.fn();
+  const runtime = createTwitchExtensionRuntime({ source: { query, hasSession: async () => true, now: () => now }, contains, drivers: { nopixel: driver }, report, onViolation: violation, publish, onSessionReady });
+  return { runtime, driver, query, stop, refresh, contains, report, violation, publish, onSessionReady, advance(ms: number) { now += ms; } };
 }
 const selected = { nopixel: "123" };
 describe("privileged tabless provider runtime", () => {
@@ -182,5 +183,73 @@ describe("refresh cadence", () => {
     await s.runtime.update(selected);
     expect(s.refresh).toHaveBeenCalledOnce();
     s.runtime.stop();
+  });
+});
+
+describe("pushed refresh", () => {
+  it("refreshes the current session at once, only on its own channel", async () => {
+    const s = setup(); await s.runtime.update(selected);
+    s.runtime.refreshNow("nopixel", "999");
+    expect(s.refresh).not.toHaveBeenCalled();
+    s.runtime.refreshNow("nopixel", "123");
+    await vi.waitFor(() => expect(s.refresh).toHaveBeenCalledOnce());
+    // The push reset the floor, so the next heartbeat does not poll again at once.
+    s.advance(1_000); await s.runtime.update(selected);
+    expect(s.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("never overlaps a running refresh and queues at most one more", async () => {
+    const s = setup(); await s.runtime.update(selected);
+    let finish!: () => void;
+    s.refresh.mockImplementationOnce(() => new Promise<void>((done) => { finish = done; }));
+    s.runtime.refreshNow("nopixel", "123");
+    s.runtime.refreshNow("nopixel", "123");
+    s.runtime.refreshNow("nopixel", "123");
+    expect(s.refresh).toHaveBeenCalledOnce();
+    finish();
+    await vi.waitFor(() => expect(s.refresh).toHaveBeenCalledTimes(2));
+    await new Promise((done) => setTimeout(done, 0));
+    expect(s.refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing once the session is stopped", async () => {
+    const s = setup(); await s.runtime.update(selected);
+    s.runtime.stop("nopixel");
+    s.runtime.refreshNow("nopixel", "123");
+    expect(s.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("broadcast token", () => {
+  it("hands out the live session's JWT for its channel only, and none once stopped", async () => {
+    const s = setup(); await s.runtime.update(selected);
+    const token = s.runtime.broadcastToken("nopixel", "123");
+    expect(token).toMatch(/^eyJheader\./);
+    expect(s.runtime.broadcastToken("nopixel", "999")).toBeUndefined();
+    s.advance(61_000);
+    // Under a minute left: the session is about to be renewed.
+    expect(s.runtime.broadcastToken("nopixel", "123")).toBeUndefined();
+    s.runtime.stop("nopixel");
+    expect(s.runtime.broadcastToken("nopixel", "123")).toBeUndefined();
+  });
+});
+
+describe("session ready", () => {
+  it("says so once the driver runs, so the broadcast token can be used at once", async () => {
+    const s = setup(); await s.runtime.update(selected);
+    expect(s.onSessionReady).toHaveBeenCalledExactlyOnceWith("nopixel", "123");
+    expect(s.runtime.broadcastToken("nopixel", "123")).toBeDefined();
+    await s.runtime.update(selected);
+    expect(s.onSessionReady).toHaveBeenCalledOnce();
+  });
+
+  it("stays quiet for a session stopped before its driver was ready", async () => {
+    const s = setup(); let resolve!: (value: { stop: () => void }) => void;
+    s.driver.mockImplementation(async () => new Promise((done) => { resolve = done; }) as never);
+    const pending = s.runtime.update(selected);
+    await vi.waitFor(() => expect(s.driver).toHaveBeenCalledOnce());
+    s.runtime.stop("nopixel");
+    resolve({ stop: s.stop }); await pending;
+    expect(s.onSessionReady).not.toHaveBeenCalled();
   });
 });

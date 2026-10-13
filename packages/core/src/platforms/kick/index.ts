@@ -10,6 +10,9 @@ import { diagnostic, ignoreEvent, type AdapterOperationOptions, type ChannelChec
 import { kickCandidatesFromCampaign, mergeKickProgress, parseKickCampaigns } from "./parser";
 import { KICK_CLIENT_TOKEN, KickWatcher } from "./watch";
 import { KickDiscoverySignalController } from "./discoverySignals";
+import { KickChatPresenceClient } from "./chatPresence";
+import { type KickRealtimeConnection, kickRealtimePost } from "./realtime";
+import type { ChatPresenceClient } from "../../core/chatPresence";
 import type { ResolvedCompatibility } from "../../compatibility/types";
 import { createKickClaimCapability } from "./claim/factory";
 import type { KickClaimCapability } from "./claim/types";
@@ -17,6 +20,7 @@ import { safeHttpsUrl } from "./claim/types";
 import { KickClaimState } from "./claim/v2";
 import { isSafeFetchError } from "../../core/fetchError";
 import { KickRouteCounts, KickRouteState, safeKickRouteHost } from "./routeDiagnostics";
+import { errorMessage } from "@lurkloot/shared/errors";
 
 export { createKickClaimCapability } from "./claim/factory";
 export type { KickClaimCapability, KickClaimOutcome } from "./claim/types";
@@ -46,6 +50,16 @@ export interface KickAdapterOptions {
   compatibility: ResolvedCompatibility["kick"];
   claimState?: KickClaimState;
   discoveryState?: KickDiscoveryState;
+  // The host's one Kick realtime connection, shared by discovery signals and
+  // chat presence (#755). `kickOrigin` says its sockets carry kick.com's
+  // origin (the extension's socket host, #792); only then is chat presence
+  // offered, since Kick's realtime server refuses an extension origin (#754).
+  realtime?: { connection: KickRealtimeConnection; kickOrigin: boolean };
+  // Kick realtime negotiation goes through this when given. It must never
+  // fall back to a page-context tab: discovery signals negotiate on every
+  // Kick farm (#755). Without it, the adapter's own fetcher is used, which is
+  // right for a host whose fetcher has no tab fallback (the CLI).
+  realtimeFetcher?: PageFetcher;
 }
 
 interface KickLivestreamsResponse {
@@ -293,6 +307,7 @@ export class KickAdapter implements PlatformAdapter {
   private readonly claimCapability: KickClaimCapability;
   private readonly discoveryState: KickDiscoveryState;
   readonly createDiscoverySignalController?: () => DiscoverySignalController;
+  readonly createChatPresenceClient?: () => ChatPresenceClient;
 
   flushRouteDiagnostics(emit: EventEmitter): void {
     this.fetcher.flushRouteDiagnostics?.(emit);
@@ -379,9 +394,22 @@ export class KickAdapter implements PlatformAdapter {
   ) {
     this.compatibility = options.compatibility;
     this.discoveryState = options.discoveryState ?? new KickDiscoveryState();
+    // Realtime and presence calls never fall back to a page-context tab:
+    // discovery negotiates on every Kick farm, and presence is tabless.
+    const realtimeFetcher = options.realtimeFetcher ?? this.fetcher;
+    const postJson = kickRealtimePost((url, init) => realtimeFetcher.fetchJson<unknown>(url, init, this.emit));
+    const shared = options.realtime;
     if (this.webSocketFactory) {
       const createWebSocket = this.webSocketFactory;
-      this.createDiscoverySignalController = () => new KickDiscoverySignalController({ createWebSocket });
+      this.createDiscoverySignalController = () => new KickDiscoverySignalController({
+        createWebSocket,
+        postJson,
+        ...(shared ? { connection: shared.connection } : {}),
+      });
+    }
+    if (shared?.kickOrigin) {
+      const getJson = (url: string) => realtimeFetcher.fetchJson<unknown>(url, undefined, this.emit);
+      this.createChatPresenceClient = () => new KickChatPresenceClient({ connection: shared.connection, postJson, getJson });
     }
     this.claimCapability = createKickClaimCapability(
       options.compatibility.claim,
@@ -454,7 +482,7 @@ export class KickAdapter implements PlatformAdapter {
   }
 
   private reportProgressFallback(error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     diagnostic(this.emit, "warn", `Could not read Kick drop progress; using last-known progress: ${message}`, "kick");
   }
 
@@ -525,7 +553,7 @@ export class KickAdapter implements PlatformAdapter {
       diagnostic(
         this.emit,
         "debug",
-        `Kick followed-channel lookup failed (${error instanceof Error ? error.message : String(error)}); channel preference falls back to viewer count`,
+        `Kick followed-channel lookup failed (${errorMessage(error)}); channel preference falls back to viewer count`,
         "kick",
       );
       return [];
@@ -780,7 +808,7 @@ export class KickAdapter implements PlatformAdapter {
       } catch (error) {
         signal?.throwIfAborted();
         if (authHealthFromError(error)) throw error;
-        diagnostic(this.emit, "warn", `Kick challenge ${id} claim failed: ${error instanceof Error ? error.message : String(error)}`, "kick");
+        diagnostic(this.emit, "warn", `Kick challenge ${id} claim failed: ${errorMessage(error)}`, "kick");
       }
     }
     return claimed;
@@ -814,7 +842,7 @@ export class KickAdapter implements PlatformAdapter {
     const originalMessage = requireComplete && isSafeFetchError(originalError)
       ? `${originalError.failure.kind}${originalError.failure.status == null ? "" : ` status=${originalError.failure.status}`}`
       : requireComplete ? "provider evidence unavailable"
-      : originalError instanceof Error ? originalError.message : String(originalError);
+      : errorMessage(originalError);
     diagnostic(this.emit, "debug", `Kick API channel check failed for ${channel.username}, falling back to the channel page: ${originalMessage}`, "kick");
     try {
       const page = await fetcher.fetchJson<{ html?: string }>(channel.url, { signal }, this.emit);

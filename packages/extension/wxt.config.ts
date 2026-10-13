@@ -3,7 +3,17 @@ import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
-import { KASADA_COOKIE_ORIGIN } from "./src/core/cliCredentialExport";
+import {
+  KICK_HOST_ORIGIN,
+  KICK_SOCKET_ORIGIN,
+  PLATFORM_IVS_ORIGIN,
+  PUSHER_SOCKET_ORIGIN,
+  TWITCH_CDN_ORIGIN,
+  TWITCH_EXTENSION_HOST_ORIGIN,
+  TWITCH_HOST_ORIGIN,
+  TWITCH_SOCKET_ORIGIN,
+  TWITCH_STATIC_CDN_ORIGIN,
+} from "./src/core/platformHosts";
 import { TWITCH_HLS_HOST_ORIGIN } from "./src/core/twitchHlsPermission";
 import { applyProviderOptionalPermissions } from "./src/extensions/manifest";
 
@@ -34,17 +44,40 @@ export default defineConfig({
     },
     plugins: [tailwindcss()],
   }),
-  manifest: {
+  manifest: ({ browser }) => ({
     default_locale: "en",
     name: "__MSG_extensionStoreName__",
     description: "__MSG_extensionDescription__",
-    permissions: ["alarms", "storage", "tabs", "scripting", "notifications", "cookies", "webRequest"],
-    // Kasada is requested by the CLI credential export. The video CDN is
-    // requested when Twitch is turned on and the HLS watch heartbeat is selected.
-    optional_host_permissions: [KASADA_COOKIE_ORIGIN, TWITCH_HLS_HOST_ORIGIN],
+    // declarativeNetRequestWithHostAccess (no install warning; acts only on
+    // granted hosts): presents the platform's site Origin on the extension's
+    // own platform requests and sockets (platformRequestOrigin.ts).
+    // offscreen (Chrome only, no install warning): the socket host, whose
+    // worker opens the platform sockets where those rules reach them (#792).
+    // webRequestBlocking (Firefox only): Firefox's rules skip the background
+    // page's sockets, so a listener sets their Origin (platformSocketOrigin.ts).
+    permissions: [
+      "alarms", "storage", "tabs", "scripting", "notifications", "cookies", "webRequest",
+      "declarativeNetRequestWithHostAccess",
+      ...(browser === "firefox" ? ["webRequestBlocking"] : ["offscreen"]),
+    ],
+    // Optional hosts come only from opted-in Twitch Extension providers
+    // (applyProviderOptionalPermissions). Twitch CDN / Kasada is required.
+    // Twitch's video CDN carries the HLS watch heartbeat, the default.
+    // The static CDN, Twitch CDN (Kasada), Amazon IVS, and Twitch Extensions
+    // hosts sit outside *.twitch.tv / *.kick.com and are granted now so a
+    // later farming path does not need another privilege escalation.
     host_permissions: [
-      "https://*.twitch.tv/*",
-      "https://*.kick.com/*"
+      TWITCH_HOST_ORIGIN,
+      KICK_HOST_ORIGIN,
+      TWITCH_HLS_HOST_ORIGIN,
+      TWITCH_STATIC_CDN_ORIGIN,
+      TWITCH_CDN_ORIGIN,
+      PLATFORM_IVS_ORIGIN,
+      TWITCH_EXTENSION_HOST_ORIGIN,
+      // A socket's Origin can be set only with its wss:// host (#792).
+      TWITCH_SOCKET_ORIGIN,
+      KICK_SOCKET_ORIGIN,
+      PUSHER_SOCKET_ORIGIN,
     ],
     // The in-page panel is an extension page the twitch/kick content scripts
     // embed in an iframe, so its document must be web-accessible. Scoped to the
@@ -55,7 +88,7 @@ export default defineConfig({
     web_accessible_resources: [
       {
         resources: ["inpagePanel.html"],
-        matches: ["https://*.twitch.tv/*", "https://*.kick.com/*"]
+        matches: [TWITCH_HOST_ORIGIN, KICK_HOST_ORIGIN],
       }
     ],
     icons: {
@@ -80,7 +113,7 @@ export default defineConfig({
         }
       }
     }
-  },
+  }),
   zip: {
     sourcesRoot: ".",
     artifactTemplate: "{{name}}-{{version}}-{{browser}}.zip",

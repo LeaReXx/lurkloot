@@ -12,7 +12,7 @@ The diagnostic event log records the extension's own activity — campaign and r
 
 ## Platform Access
 
-Lurkloot accesses Twitch and Kick only to provide its core drops-farming functionality: detecting campaigns, checking progress, sending tabless watch heartbeats or managing visible muted watch tabs, and claiming eligible rewards. When Twitch is turned on and the HLS watch heartbeat is selected, the extension asks for optional access to Twitch's video CDN (`ttvnw.net`). Tabless watching then requests playlist and media-segment headers from that CDN so progress can advance; it does not download or play the video. The extension acts entirely within the user's existing logged-in browser session.
+Lurkloot accesses Twitch and Kick only to provide its core drops-farming functionality: detecting campaigns, checking progress, sending tabless watch heartbeats or managing visible muted watch tabs, and claiming eligible rewards. It also has access to Twitch's video CDN (`ttvnw.net`): when the HLS watch heartbeat is selected, tabless watching requests playlist and media-segment headers from that CDN so progress can advance; it does not download or play the video. It may also contact Twitch's static CDN (`jtvnw.net`) for campaign and channel artwork, Twitch CDN (`twitchcdn.net`, including Kasada) for related first-party services and an explicit CLI credential export, Amazon IVS (`live-video.net`) for Kick livestream and Twitch player media infrastructure, and Twitch Extensions hosts (`ext-twitch.tv`) for extension-adjacent farming surfaces. The extension acts entirely within the user's existing logged-in browser session.
 
 To authorize requests inside that session, the extension reads certain session values on the user's own device:
 

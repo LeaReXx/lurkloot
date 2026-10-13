@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { AlertTriangle, Check, Gift, Package, Puzzle, Sparkles, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Check, Gift, MessageSquareOff, Package, Puzzle, Sparkles, type LucideIcon } from "lucide-react";
 import { Pill, ProgressBar, SectionHeader, Toggle, cn } from "./primitives";
-import type { ExtensionSettings, TwitchExtensionProviderId, TwitchExtensionSummary } from "@lurkloot/shared/models";
+import type { ChatPresenceStatus, ExtensionSettings, TwitchExtensionProviderId, TwitchExtensionSummary } from "@lurkloot/shared/models";
 import type { PopupAdapter } from "./types";
 import { useT } from "./context";
 import { WatchSourcePlace } from "./watchSourcePriority";
@@ -37,6 +37,8 @@ function statusKey(provider: TwitchExtensionProviderId, summary: TwitchExtension
     case "watchtime": case "collecting": case "giveaway": return "extensionFarming";
     case "phase-closed": return "extensionPhaseClosed";
     case "connecting": return "extensionConnecting";
+    // The channel doesn't run this extension; the provider waits for one that does.
+    case "not-installed": return "extensionIdle";
     default: return summary.status === "error" ? "extensionUnavailable" : "extensionIdle";
   }
 }
@@ -45,7 +47,7 @@ function statusTone(summary: TwitchExtensionSummary | undefined): PillTone {
   switch (summary?.reasonCode) {
     // Every enabled provider is probed on the watched channel, so "not on this
     // channel" is the normal state while a drop or another provider holds it.
-    case "channel-required": case "channel-ineligible": case "channel-not-connected": case "phase-closed": return "muted";
+    case "channel-required": case "not-installed": case "channel-ineligible": case "channel-not-connected": case "phase-closed": return "muted";
   }
   switch (summary?.status) {
     case "complete": return "live";
@@ -70,7 +72,7 @@ function StatusBadge({ badge }: { badge: Badge }) {
   );
 }
 
-function providerDetails(provider: TwitchExtensionProviderId, summary: TwitchExtensionSummary | undefined, t: ReturnType<typeof useT>): { progress?: { label: string; percent: number; earned: number; required: number }; badges: Badge[] } {
+function providerDetails(provider: TwitchExtensionProviderId, summary: TwitchExtensionSummary | undefined, t: ReturnType<typeof useT>, chatPresenceBlocked = false): { progress?: { label: string; percent: number; earned: number; required: number }; badges: Badge[] } {
   const badges: Badge[] = [];
   if (!summary) return { badges };
   let progress: { label: string; percent: number; earned: number; required: number } | undefined;
@@ -78,6 +80,7 @@ function providerDetails(provider: TwitchExtensionProviderId, summary: TwitchExt
   if (provider === "nopixel") {
     const daily = summary.progress.find((item) => item.key === "daily-pack");
     if (daily) progress = { label: t("extensionDailyPackProgress", [String(daily.earned), String(daily.required)]), percent: percentOf(daily.earned, daily.required), earned: daily.earned, required: daily.required };
+    if (chatPresenceBlocked) badges.push({ key: "chat-presence", icon: MessageSquareOff, tone: "warning", label: t("extensionChatPresenceBlocked") });
     const giveaway = summary.pending.find((item) => item.key === "giveaway");
     if (giveaway?.state === "done") badges.push({ key: "giveaway", icon: Check, tone: "live", label: t("extensionGiveawayEntered") });
     if (giveaway?.state === "open") badges.push({ key: "giveaway", icon: Gift, tone: "accent", label: t("extensionGiveawayOpen") });
@@ -197,12 +200,14 @@ export const TWITCH_EXTENSION_PROVIDERS = PROVIDERS;
  * The grouped list could only afford a name, a count and a couple of badges per
  * provider; here everything the summary carries is visible at once — status,
  * progress, every badge, the provider's own option, and the way to turn it off. */
-export function TwitchExtensionView({ providerId, settings, summary, active, pending, onEnabledChange, onOptionChange, onSetup, onChangeOrder }: {
+export function TwitchExtensionView({ providerId, settings, summary, active, pending, chatPresence, onEnabledChange, onOptionChange, onSetup, onChangeOrder }: {
   providerId: TwitchExtensionProviderId;
   settings: ExtensionSettings;
   summary?: TwitchExtensionSummary;
   active: boolean;
   pending: boolean;
+  // The Twitch chat presence status; NoPixelV earns watch time only while joined.
+  chatPresence?: ChatPresenceStatus;
   // Resolves false when the browser denied the permission the provider needs.
   onEnabledChange(enabled: boolean): Promise<boolean | void>;
   onOptionChange(enabled: boolean): void | Promise<void>;
@@ -216,7 +221,11 @@ export function TwitchExtensionView({ providerId, settings, summary, active, pen
   const option = providerId === "nopixel"
     ? settings.twitchExtensions.nopixel.autoOpenPacks
     : settings.twitchExtensions.fortnite.allowTakeovers;
-  const { progress, badges } = providerDetails(providerId, summary, t);
+  // While NoPixelV holds the watch, no presence status at all is not being in
+  // chat either; a join in progress (every lane rotation) is not a failure.
+  const chatPresenceBlocked = providerId === "nopixel" && active
+    && chatPresence?.state !== "joined" && chatPresence?.state !== "joining";
+  const { progress, badges } = providerDetails(providerId, summary, t, chatPresenceBlocked);
   const [failure, setFailure] = useState<string>();
 
   // Same outcomes the settings section reports: a denied permission leaves

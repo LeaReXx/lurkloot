@@ -37,18 +37,24 @@ export interface HostCapabilities {
   readonly twitchIntegrityCapture: boolean;
   // Supplemental watch sources such as Twitch Extensions (`twitch.supplementalSources`).
   readonly supplementalSources: boolean;
+  // Joining the watched channel's chat (chatPresence.ts). It has no port: the
+  // adapters create the clients, so a platform whose adapter offers none (Kick
+  // on the CLI) still reports alwaysEnterChat as having no effect.
+  readonly chatPresence: boolean;
 }
 
 export const EXTENSION_CAPABILITIES: HostCapabilities = {
   browserTabs: true,
   twitchIntegrityCapture: true,
   supplementalSources: true,
+  chatPresence: true,
 };
 
 export const CLI_CAPABILITIES: HostCapabilities = {
   browserTabs: false,
   twitchIntegrityCapture: false,
   supplementalSources: false,
+  chatPresence: true,
 };
 
 // Generic over the host's settings type `S`, which must satisfy the engine
@@ -184,6 +190,12 @@ export interface SupplementalSourcesPort<S extends EngineSettings> {
     signal?: AbortSignal,
     source?: WatchSourceId,
   ): Promise<SupplementalWatchTarget | undefined>;
+  // A refresh-worthy message arrived on the watching provider's Hermes
+  // broadcast topic for `channelId` (#757). Fire and forget.
+  refreshNow?(provider: string, channelId: string): void;
+  // The provider's current extension JWT for `channelId`, which Hermes requires
+  // to subscribe its broadcast topic. In memory only; never logged.
+  broadcastToken?(provider: string, channelId: string): string | undefined;
 }
 
 export interface TwitchHostPorts<S extends EngineSettings> {

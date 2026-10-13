@@ -1,7 +1,7 @@
 import { discoverTwitchExtensionChannels } from "@lurkloot/core/extensions/discovery";
 import { pausedForManualWatch } from "@lurkloot/core/manualWatch";
-import { twitchExtensionProviders } from "@lurkloot/core/extensions/registry";
-import type { ChannelCandidate, ExtensionSettings, SchedulerState, SupplementalWatchTarget, TwitchExtensionProviderId, TwitchExtensionSummary, WatchSourceId } from "@lurkloot/shared/models";
+import { twitchExtensionProviderOrigins, twitchExtensionProviders } from "@lurkloot/core/extensions/registry";
+import type { ChannelCandidate, ExtensionSettings, SchedulerState, SupplementalWatchTarget, TwitchExtensionProviderId, TwitchExtensionReport, TwitchExtensionSummary, WatchSourceId } from "@lurkloot/shared/models";
 import type { EngineEvent } from "@lurkloot/shared/events";
 import type { SettingsPatch } from "@lurkloot/shared/settings";
 import { normalizeWatchSourcePriority } from "@lurkloot/shared/watchSources";
@@ -17,6 +17,8 @@ export interface TwitchExtensionLaneMemory {
   readonly knownComplete: Partial<Record<TwitchExtensionProviderId, number>>;
   readonly completedUntil: Partial<Record<TwitchExtensionProviderId, number>>;
   readonly unavailableUntil: Record<string, number>;
+  // Providers waiting for the viewer to share their Twitch identity (#727).
+  readonly identityRequiredUntil: Partial<Record<TwitchExtensionProviderId, number>>;
   readonly lastCompletedNoPixelChannel?: string;
   // The Twitch login the deadlines were learned for. Completion belongs to the
   // account, so memory saved for another login is never restored.
@@ -33,6 +35,11 @@ const CHANNEL_LOGIN = /^[a-z0-9_]{1,25}$/;
 // the next UTC midnight); anything further out is not ours.
 const MAX_DEADLINE_MS = 25 * 60 * 60_000;
 const MAX_UNAVAILABLE_ENTRIES = 64;
+// Twitch grants identity per extension, so identity-required is the same
+// answer on every channel (#727). It blocks the provider, not the channel, for
+// this long before the provider is probed again; a channel walk would only
+// repeat the report on each one.
+const IDENTITY_REPROBE_MS = 15 * 60_000;
 
 export function parseTwitchExtensionLaneMemory(value: unknown, now: number): TwitchExtensionLaneMemory | undefined {
   if (!value || typeof value !== "object" || (value as { version?: unknown }).version !== 1) return undefined;
@@ -62,6 +69,7 @@ export function parseTwitchExtensionLaneMemory(value: unknown, now: number): Twi
     knownComplete: byProvider(raw.knownComplete),
     completedUntil: byProvider(raw.completedUntil),
     unavailableUntil,
+    identityRequiredUntil: byProvider(raw.identityRequiredUntil),
     ...(typeof channel === "string" && /^[a-zA-Z0-9_]{1,25}$/.test(channel) ? { lastCompletedNoPixelChannel: channel } : {}),
     ...(typeof owner === "string" && CHANNEL_LOGIN.test(owner) ? { owner } : {}),
   };
@@ -72,6 +80,16 @@ function normalizedLogin(value: string | undefined): string | undefined {
   return login && CHANNEL_LOGIN.test(login) ? login : undefined;
 }
 
+// `Twitch extension nopixel farming on prod: watchtime, daily-pack 12/60, giveaway open`
+function reportLine(id: string, report: TwitchExtensionReport, channel: { username: string } | undefined): string {
+  const details = [
+    report.reasonCode,
+    ...report.progress.map((counter) => `${counter.key} ${counter.earned}/${counter.required}`),
+    ...report.pending.map((item) => `${item.key} ${item.state}`),
+  ];
+  return `Twitch extension ${id} ${report.status}${channel ? ` on ${channel.username}` : ""}: ${details.join(", ")}`;
+}
+
 export function createTwitchExtensionHost(options: {
   source: SessionSource;
   permissions: ProviderPermissionPort;
@@ -79,7 +97,8 @@ export function createTwitchExtensionHost(options: {
   loadSettings(): Promise<ExtensionSettings>;
   loadState(): Promise<SchedulerState>;
   savePatch(patch: SettingsPatch): Promise<void>;
-  diagnostic(message: string): void;
+  // Warn level unless `level` says otherwise.
+  diagnostic(message: string, level?: "warn" | "debug"): void;
   // Publishes driver activity; the runtime drops it once the session ended.
   publish(events: readonly EngineEvent[]): void;
   // Where completion and cooldowns outlive the service worker. Without it
@@ -89,6 +108,9 @@ export function createTwitchExtensionHost(options: {
   viewerLogin?(): Promise<string | undefined>;
   // Asks the scheduler to choose again now, rather than at its next poll.
   requestTick?(): void;
+  // A provider session became ready; the Hermes connection can now follow its
+  // broadcast topic without waiting for the next tick (#757).
+  onSessionReady?(): void;
 }) {
   let generation = 0;
   const allowed = new Set<TwitchExtensionProviderId>();
@@ -99,6 +121,8 @@ export function createTwitchExtensionHost(options: {
   const knownComplete = new Map<TwitchExtensionProviderId, number>();
   const activeReprobes = new Set<TwitchExtensionProviderId>();
   const unavailableUntil = new Map<string, number>();
+  const identityRequiredUntil = new Map<TwitchExtensionProviderId, number>();
+  const identityBlocked = (id: TwitchExtensionProviderId, now: number) => (identityRequiredUntil.get(id) ?? 0) > now;
   const completionDeadline = (id: TwitchExtensionProviderId, now: number, delay: number) => id === "nopixel"
     ? Math.min(now + delay, (Math.floor(now / 86_400_000) + 1) * 86_400_000)
     : now + delay;
@@ -141,6 +165,9 @@ export function createTwitchExtensionHost(options: {
       for (const [key, until] of Object.entries(memory.unavailableUntil)) {
         if (keep(key.split(":")[0] as TwitchExtensionProviderId) && !unavailableUntil.has(key)) unavailableUntil.set(key, until);
       }
+      for (const [id, until] of Object.entries(memory.identityRequiredUntil) as [TwitchExtensionProviderId, number][]) {
+        if (keep(id) && !identityRequiredUntil.has(id)) identityRequiredUntil.set(id, until);
+      }
     } catch {
       // Unreadable memory is the same as none: providers are probed again.
     } finally {
@@ -163,6 +190,7 @@ export function createTwitchExtensionHost(options: {
           knownComplete: live(knownComplete),
           completedUntil: live(completedUntil),
           unavailableUntil: live(unavailableUntil) as Record<string, number>,
+          identityRequiredUntil: live(identityRequiredUntil),
           ...(lastCompletedNoPixelChannel ? { lastCompletedNoPixelChannel } : {}),
           ...(owner ? { owner } : {}),
         });
@@ -175,6 +203,7 @@ export function createTwitchExtensionHost(options: {
     source: options.source,
     contains: (origin) => options.permissions.contains({ origins: [origin] }),
     drivers: options.drivers,
+    onSessionReady: () => options.onSessionReady?.(),
     report: (id, report) => {
       const previous = summaries[id];
       if (id === "nopixel" && report.status === "complete" && channel) lastCompletedNoPixelChannel = channel.username;
@@ -189,20 +218,33 @@ export function createTwitchExtensionHost(options: {
       }
       if (["complete", "farming", "error", "unavailable"].includes(report.status)) activeReprobes.delete(id);
       if (report.status === "complete" && (completedUntil.get(id) ?? 0) <= options.source.now()) completedUntil.set(id, completionDeadline(id, options.source.now(), 5 * 60_000));
-      if ((report.status === "error" || report.status === "unavailable") && channel) {
+      const identityRequired = report.status === "unavailable" && report.reasonCode === "identity-required";
+      if (identityRequired) identityRequiredUntil.set(id, options.source.now() + IDENTITY_REPROBE_MS);
+      else if ((report.status === "error" || report.status === "unavailable") && channel) {
         // Start cooldown from the observed failure once. Re-reading an old
         // summary during selection must not renew it and starve this channel.
         unavailableUntil.set(`${id}:${channel.username.toLowerCase()}`, options.source.now() + 5 * 60_000);
       }
       summaries[id] = { ...report, ...(channel ? { channel: { ...channel } } : {}), updatedAt: new Date(options.source.now()).toISOString() };
-      if ((report.status === "error" || report.status === "unavailable")
+      // Every enabled provider runs on whatever channel the lane watches, so a
+      // channel without its extension is routine, not worth a warning (#728).
+      if ((report.status === "error" || report.status === "unavailable") && report.reasonCode !== "not-installed"
         && (previous?.status !== report.status || previous.reasonCode !== report.reasonCode || previous.channel?.username !== channel?.username)) {
         // Runtime reports have already passed the bounded allowlist validator.
         // Preserve an actionable outcome after discovery moves to another channel,
         // without retaining vendor bodies, credentials or exception text.
         options.diagnostic(`Twitch extension ${id} ${report.status}${channel ? ` on ${channel.username}` : ""}: ${report.reasonCode}`);
       }
+      // Every other change of status, reason or counters, at debug (#729), so an
+      // export shows whether a provider's progress moved. Keys and counters
+      // only; the report has already passed the allowlist validator.
+      if (report.status !== "error" && report.status !== "unavailable" && reportLine(id, report, channel) !== (previous && reportLine(id, previous, previous.channel))) {
+        options.diagnostic(reportLine(id, report, channel), "debug");
+      }
       if (["complete", "farming", "error", "unavailable"].includes(report.status)) persist();
+      // Release the lane now rather than at the next poll, which can be an
+      // hour away; the session would otherwise sit on a provider that stopped.
+      if (identityRequired) options.requestTick?.();
     },
     onViolation: (_id, diagnostic) => options.diagnostic(diagnostic),
     publish: options.publish,
@@ -223,6 +265,7 @@ export function createTwitchExtensionHost(options: {
       knownComplete.delete(id);
       activeReprobes.delete(id);
       discovery.delete(id);
+      identityRequiredUntil.delete(id);
       for (const key of unavailableUntil.keys()) if (key.startsWith(`${id}:`)) unavailableUntil.delete(key);
       if (id === "nopixel") lastCompletedNoPixelChannel = undefined;
       if (!restoreApplied) clearedBeforeRestore.providers.add(id);
@@ -276,12 +319,13 @@ export function createTwitchExtensionHost(options: {
       .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     for (const provider of providers) {
       if (!settings.twitchExtensions[provider.id].enabled || !options.drivers[provider.id]) continue;
-      if (!await options.permissions.contains({ origins: [provider.backendOrigin] })) continue;
+      if (!await options.permissions.contains({ origins: twitchExtensionProviderOrigins(provider) })) continue;
       signal?.throwIfAborted();
       if (selectedGeneration !== generation) return;
       const now = options.source.now();
       if ((knownComplete.get(provider.id) ?? 0) > now) continue;
       if ((completedUntil.get(provider.id) ?? 0) > now) continue;
+      if (identityBlocked(provider.id, now)) continue;
       completedUntil.delete(provider.id);
       let cache = discovery.get(provider.id);
       if (!cache) { cache = { channels: [], expiresAt: 0 }; discovery.set(provider.id, cache); }
@@ -338,6 +382,14 @@ export function createTwitchExtensionHost(options: {
       const id = provider.id;
       activeReprobes.delete(id);
       if (!settings.twitchExtensions[id].enabled || !allowed.has(id)) { delete summaries[id]; continue; }
+      if (identityBlocked(id, options.source.now())) {
+        // Keep asking the user to link the account, even after an
+        // invalidation or a restart dropped the summary that said so.
+        if (summaries[id]?.reasonCode !== "identity-required") {
+          summaries[id] = { status: "unavailable", reasonCode: "identity-required", progress: [], pending: [{ key: "account-link", state: "blocked" }], updatedAt: new Date(options.source.now()).toISOString() };
+        }
+        continue;
+      }
       // Only the scheduler's selected due reprobe may revisit a completed
       // provider. Incidental runs on lower sources must not renew its deadline.
       const completionUntil = knownComplete.get(id);
@@ -382,6 +434,7 @@ export function createTwitchExtensionHost(options: {
       knownComplete.clear();
       completedUntil.clear();
       unavailableUntil.clear();
+      identityRequiredUntil.clear();
       discovery.clear();
       lastCompletedNoPixelChannel = undefined;
       if (!restoreApplied) clearedBeforeRestore.all = true;
@@ -431,5 +484,16 @@ export function createTwitchExtensionHost(options: {
   function snapshot() {
     return structuredClone(summaries);
   }
-  return { reconcile, chooseWatchTarget, setEnabled, removed, invalidate, snapshot, recordHeartbeatFailure, credentialsChanged };
+  // A push said the watching provider's state changed (#757). Only an enabled,
+  // permitted provider's live session on that channel refreshes.
+  function refreshNow(provider: string, channelId: string): void {
+    const id = twitchExtensionProviders.find((candidate) => candidate.id === provider)?.id;
+    if (!id || !allowed.has(id)) return;
+    runtime.refreshNow(id, channelId);
+  }
+  function broadcastToken(provider: string, channelId: string): string | undefined {
+    const id = twitchExtensionProviders.find((candidate) => candidate.id === provider)?.id;
+    return id && allowed.has(id) ? runtime.broadcastToken(id, channelId) : undefined;
+  }
+  return { reconcile, chooseWatchTarget, setEnabled, removed, invalidate, snapshot, recordHeartbeatFailure, credentialsChanged, refreshNow, broadcastToken };
 }

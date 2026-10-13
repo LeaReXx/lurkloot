@@ -1,6 +1,7 @@
 import type { ChannelCandidate, DropCampaign, EngineSettings, Platform, WatchSession } from "@lurkloot/shared/models";
 import { evaluateCampaignFarming } from "@lurkloot/shared/campaignFarming";
 import type { ChannelCheckRequest, PlatformAdapter } from "../platforms/adapter";
+import { errorMessage } from "@lurkloot/shared/errors";
 
 export type ChannelEligibility = true | false | "unknown";
 
@@ -8,6 +9,8 @@ export interface DiscoveryCandidateObservation {
   candidate: ChannelCandidate;
   live: boolean;
   categoryMatches: boolean;
+  // ChannelCheck.offlineConfirmed, kept so retention reads it from the snapshot.
+  offlineConfirmed?: true;
   eligible: ChannelEligibility;
   observedAt: number;
 }
@@ -148,6 +151,7 @@ export async function collectDiscoverySnapshot(
         candidate: check.candidate,
         live: check.live,
         categoryMatches: check.categoryMatches,
+        ...(check.offlineConfirmed ? { offlineConfirmed: true as const } : {}),
         eligible: check.campaignMatches ?? "unknown" as const,
         observedAt: now(),
       })));
@@ -160,6 +164,7 @@ export async function collectDiscoverySnapshot(
           candidate: check.candidate,
           live: check.live,
           categoryMatches: check.categoryMatches,
+          ...(check.offlineConfirmed ? { offlineConfirmed: true as const } : {}),
           eligible: check.campaignMatches ?? "unknown",
           observedAt: now(),
         });
@@ -195,6 +200,7 @@ export async function collectDiscoverySnapshot(
         candidate: check.candidate,
         live: check.live,
         categoryMatches: check.categoryMatches,
+        ...(check.offlineConfirmed ? { offlineConfirmed: true as const } : {}),
         eligible: request.campaign ? check.campaignMatches ?? "unknown" : "unknown",
         observedAt: now(),
       });
@@ -212,6 +218,7 @@ export async function collectDiscoverySnapshot(
       candidate: check.candidate,
       live: check.live,
       categoryMatches: check.categoryMatches,
+      ...(check.offlineConfirmed ? { offlineConfirmed: true as const } : {}),
       eligible: "unknown" as const,
       observedAt: now(),
     })));
@@ -224,6 +231,7 @@ export async function collectDiscoverySnapshot(
         candidate: check.candidate,
         live: check.live,
         categoryMatches: check.categoryMatches,
+        ...(check.offlineConfirmed ? { offlineConfirmed: true as const } : {}),
         eligible: "unknown",
         observedAt: now(),
       });
@@ -320,6 +328,7 @@ export function selectionAdapterFromDiscoverySnapshot(
       }
       return {
         live: observation.live,
+        ...(observation.offlineConfirmed ? { offlineConfirmed: true } : {}),
         categoryMatches: observation.categoryMatches,
         campaignMatches: observation.eligible === "unknown" ? undefined : observation.eligible,
         candidate: observation.candidate,
@@ -456,7 +465,7 @@ export class DiscoverySnapshotLane<TRequest = undefined> {
           startedAt,
           finishedAt,
           complete: false,
-          failure: error instanceof Error ? error.message : String(error),
+          failure: errorMessage(error),
           ...(this.stopped || generation !== this.generation
             ? { discarded: this.stopped ? "stopped" as const : "stale_generation" as const }
             : { error }),

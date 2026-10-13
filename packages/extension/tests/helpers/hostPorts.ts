@@ -76,6 +76,8 @@ export interface HostMocks<S extends EngineSettings> {
     signal?: AbortSignal,
     source?: WatchSourceId,
   ): Promise<SupplementalWatchTarget | undefined>;
+  refreshSupplementalSource?(provider: string, channelId: string): void;
+  supplementalBroadcastToken?(provider: string, channelId: string): string | undefined;
   reconcilePageContextRecovery?(
     platform: Platform,
     options: PageContextRecoveryOptions,
@@ -100,6 +102,8 @@ export function mockedCapabilities<S extends EngineSettings>(mocks: HostMocks<S>
     browserTabs,
     twitchIntegrityCapture: mocks.ensureTwitchIntegrity !== undefined,
     supplementalSources: mocks.selectSupplementalWatchTarget !== undefined,
+    // Extension-shaped mocks (with tabs) join chat like the extension does.
+    chatPresence: browserTabs,
   };
 }
 
@@ -185,6 +189,12 @@ export function hostPortsFromMocks<S extends EngineSettings>(
           supplementalSources: {
             select: (state: SchedulerState, settings: S, signal?: AbortSignal, source?: WatchSourceId) =>
               m.selectSupplementalWatchTarget!("twitch", state, settings, signal, source),
+            ...(m.refreshSupplementalSource
+              ? { refreshNow: (provider: string, channelId: string) => m.refreshSupplementalSource!(provider, channelId) }
+              : {}),
+            ...(m.supplementalBroadcastToken
+              ? { broadcastToken: (provider: string, channelId: string) => m.supplementalBroadcastToken!(provider, channelId) }
+              : {}),
           },
         }
         : {}),

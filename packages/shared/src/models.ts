@@ -123,6 +123,10 @@ export interface ChannelCheck {
   // definitive false rejects the candidate; soft failures keep the existing
   // live/category validation path usable.
   campaignMatches?: boolean;
+  // An offline check that a second, independent signal agrees with, such as
+  // the platform pushing that the stream ended. One such check ends the watch
+  // instead of waiting for offlineRetryLimit consecutive ones.
+  offlineConfirmed?: boolean;
   reason?: string;
   candidate: ChannelCandidate;
 }
@@ -335,6 +339,17 @@ export interface CategorySelection {
 // goes in blockedCategories, which applies in both modes.
 export type CategoryMode = "all" | "include";
 
+// Chat presence (docs/superpowers/specs/2026-10-05-chat-presence-design.md):
+// whether LurkLoot is in the watched channel's chat. Runtime only; attached to
+// snapshots, never persisted.
+export type ChatPresenceState = "left" | "joining" | "joined" | "error" | "blocked";
+export type ChatPresenceBlockReason = "auth" | "origin-rejected" | "unsupported-provider" | "capability-absent";
+export interface ChatPresenceStatus {
+  state: ChatPresenceState;
+  channel?: string;
+  reason?: ChatPresenceBlockReason;
+}
+
 export interface PlatformSettings {
   enabled: boolean;
   watchSourcePriority: WatchSourceId[];
@@ -353,6 +368,10 @@ export interface PlatformSettings {
   // subscribed. Lurkloot then treats that reward's subscription as detected
   // (docs/superpowers/specs/2026-10-03-subscription-marks-design.md).
   subscribedRewardMarks?: string[];
+  // Join the chat of every channel watched tablessly on this platform, so the
+  // account appears in its chatter list. Off by default. Providers that need
+  // chat presence (NoPixelV) join it regardless.
+  alwaysEnterChat?: boolean;
 }
 
 // Per-platform settings carry the claim toggles that only make sense on that
@@ -469,7 +488,9 @@ export interface EngineSettings {
 export type TwitchExtensionProviderId = "nopixel" | "fortnite";
 export type TwitchExtensionStatus = "idle" | "discovering" | "connecting" | "farming" | "complete" | "unavailable" | "error";
 export type TwitchExtensionReasonCode = "disabled" | "permission-required" | "auth-required" | "identity-required"
-  | "channel-required" | "channel-ineligible" | "channel-not-connected" | "watchtime" | "giveaway" | "collecting"
+  // `not-installed`: the watched channel doesn't have the provider's extension
+  // at all; `channel-ineligible` is the vendor's own answer (#728).
+  | "channel-required" | "not-installed" | "channel-ineligible" | "channel-not-connected" | "watchtime" | "giveaway" | "collecting"
   | "phase-closed" | "rewards-complete" | "transport-error" | "compatibility-error" | "provider-error" | "connecting";
 export interface TwitchExtensionReport {
   status: TwitchExtensionStatus;
@@ -516,6 +537,9 @@ export interface SchedulerState {
   // Host transient summaries are attached to snapshots, not restored as an
   // active provider session. Provider credentials never belong in this state.
   twitchExtensions?: Partial<Record<TwitchExtensionProviderId, TwitchExtensionSummary>>;
+  // Live chat presence per platform, attached to snapshots like the
+  // twitchExtensions summaries. Never persisted or restored.
+  chatPresence?: Partial<Record<Platform, ChatPresenceStatus>>;
   sessions: Record<Platform, WatchSession>;
   authHealth: Record<Platform, PlatformAuthHealth>;
   // Per-platform critical-failure detection. Persisted so the flag survives an

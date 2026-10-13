@@ -8,17 +8,11 @@ import { TwitchAdapter, TwitchDiscoveryState } from "@lurkloot/core/twitch";
 import type { EngineEvent } from "@lurkloot/shared/events";
 import type { DropCampaign, DropReward, ExtensionSettings } from "@lurkloot/shared/models";
 import { chooseCampaignDecision } from "@lurkloot/core/scheduler";
+import { collectDiscoverySnapshot, selectionAdapterFromDiscoverySnapshot, type DiscoverySnapshot } from "@lurkloot/core/discoverySnapshot";
 import { DEFAULT_SETTINGS } from "@lurkloot/shared/settings";
 import { resolveCompatibility } from "@lurkloot/core";
 import { SafeFetchError, type SafeFetchFailureKind } from "@lurkloot/core/fetchError";
-import { kickAdapter, twitchAdapter, TWITCH_COMPAT } from "./helpers/adapters";
-
-function jsonFetcher(handler: (url: string, init?: RequestInit) => unknown): PageFetcher {
-  const fetchJson = vi.fn(async (url: string, init?: RequestInit): Promise<unknown> => handler(url, init));
-  return {
-    fetchJson: fetchJson as PageFetcher["fetchJson"],
-  };
-}
+import { jsonFetcher, kickAdapter, twitchAdapter, TWITCH_COMPAT } from "./helpers/adapters";
 
 function operation(init?: RequestInit): string {
   return JSON.parse(String(init?.body)).operationName;
@@ -2937,6 +2931,48 @@ describe("TwitchAdapter", () => {
     });
   });
 
+  describe("Special Events and IRL participating channels", () => {
+    const channel = { platform: "twitch" as const, username: "eventchannel", url: "https://www.twitch.tv/eventchannel", isAclMatch: true };
+    const streamInfo = {
+      data: { user: { id: "channel-id", stream: { id: "broadcast-id", game: { id: "509658", name: "Just Chatting" } } } },
+    };
+    const campaign = (categoryId: string, allowedChannels?: string[]) =>
+      ({ id: "event", categoryId, allowedChannels }) as DropCampaign;
+    const adapter = (handler: Parameters<typeof jsonFetcher>[0]) =>
+      twitchAdapter(jsonFetcher(handler), undefined, { strictCampaignAvailability: false });
+
+    it.each([
+      { label: "a Special Events allow list", event: campaign("509663", ["eventchannel"]), categoryMatches: true },
+      { label: "an IRL allow list", event: campaign("509672", ["eventchannel"]), categoryMatches: true },
+      { label: "a regular allow list", event: campaign("33214", ["eventchannel"]), categoryMatches: false },
+      { label: "Special Events without an allow list", event: campaign("509663"), categoryMatches: false },
+    ])("checks a channel streaming another category against $label: $categoryMatches", async ({ event, categoryMatches }) => {
+      await expect(adapter(() => streamInfo).checkChannel(channel, { campaign: event })).resolves.toMatchObject({
+        live: true,
+        categoryMatches,
+        candidate: { categoryId: "509658", categoryName: "Just Chatting" },
+      });
+    });
+
+    it("selects the channel through the batched stream check and keeps its live category", async () => {
+      const selection = await adapter(() => [streamInfo]).selectCandidateChannel?.([channel], campaign("509672", ["eventchannel"]));
+
+      expect(selection?.channel).toMatchObject({ username: "eventchannel", live: true, categoryId: "509658", categoryName: "Just Chatting" });
+    });
+
+    it("accepts the channel from the channel-page fallback", async () => {
+      const fallback = adapter((url) => url === channel.url
+        ? { html: '{"isLiveBroadcast":true,"game":{"id":"509658","name":"Just Chatting"}}' }
+        : { errors: [{ message: "PersistedQueryNotFound" }] });
+
+      await expect(fallback.checkChannel(channel, { campaign: campaign("509663", ["eventchannel"]) })).resolves.toMatchObject({
+        live: true,
+        categoryMatches: true,
+        candidate: { categoryId: "509658" },
+      });
+    });
+  });
+
   it("confirms the selected campaign is available on the Twitch channel", async () => {
     const fetcher = jsonFetcher((_url, init) => {
       const op = operation(init);
@@ -3616,6 +3652,72 @@ describe("TwitchAdapter", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // #759: a stream-down push vouches for an offline check, until a stream-up
+  // cancels it or it grows old.
+  describe("stream-down confirmation", () => {
+    const candidate = { platform: "twitch" as const, username: "channel-a", url: "https://www.twitch.tv/channel-a" };
+    const check = (discoveryState: TwitchDiscoveryState, live: boolean) => twitchAdapter(jsonFetcher(() => (
+      { data: { user: { id: "123", stream: live ? { id: "broadcast-a", game: { id: "game" } } : null } } }
+    )), undefined, { discoveryState }).checkChannel(candidate);
+
+    it("confirms an offline check after a stream-down push", async () => {
+      const discoveryState = new TwitchDiscoveryState();
+      discoveryState.recordPlaybackNotice({ type: "stream-down", channelId: "123" });
+      await expect(check(discoveryState, false)).resolves.toMatchObject({ live: false, offlineConfirmed: true });
+    });
+
+    it("does not confirm without a push, after a stream-up, or on a live check", async () => {
+      const none = new TwitchDiscoveryState();
+      expect((await check(none, false)).offlineConfirmed).toBeUndefined();
+      const restarted = new TwitchDiscoveryState();
+      restarted.recordPlaybackNotice({ type: "stream-down", channelId: "123" });
+      restarted.recordPlaybackNotice({ type: "stream-up", channelId: "123" });
+      expect((await check(restarted, false)).offlineConfirmed).toBeUndefined();
+      const live = new TwitchDiscoveryState();
+      live.recordPlaybackNotice({ type: "stream-down", channelId: "123" });
+      expect((await check(live, true)).offlineConfirmed).toBeUndefined();
+    });
+
+    // The tick reads retention from the discovery snapshot, which Twitch fills
+    // through selectCandidateChannel, not checkChannel.
+    it("carries the confirmation through discovery to the snapshot's retention check", async () => {
+      const discoveryState = new TwitchDiscoveryState();
+      discoveryState.recordPlaybackNotice({ type: "stream-down", channelId: "123" });
+      const streamQueries: string[] = [];
+      const fetcher = jsonFetcher((_url, init) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown> | Array<Record<string, unknown>>;
+        const requests = Array.isArray(body) ? body : [body];
+        const response = (request: Record<string, unknown>) => {
+          const channel = String((request.variables as { channel?: string }).channel);
+          streamQueries.push(channel);
+          return { data: { user: { id: "123", login: channel, stream: null } } };
+        };
+        return Array.isArray(body) ? requests.map(response) : response(body);
+      });
+      const twitch = twitchAdapter(fetcher, undefined, { discoveryState });
+      // Listed live by the directory, which is trusted unless the stream ended.
+      const watched = { ...candidate, channelId: "123", broadcastId: "broadcast-a", live: true, isAclMatch: false };
+      const result = await collectDiscoverySnapshot({
+        platform: "twitch",
+        refreshCampaigns: async () => [],
+        listCandidateChannels: async () => [],
+        checkChannel: (channel, options) => twitch.checkChannel(channel, options),
+        selectCandidateChannel: (channels, campaign, options) => twitch.selectCandidateChannel(channels, campaign, options),
+        listFollowedChannels: async () => [],
+      }, undefined, new AbortController().signal, Date.now, false, [watched]);
+      expect(streamQueries).toEqual(["channel-a"]);
+      const view = selectionAdapterFromDiscoverySnapshot({ ...result, platform: "twitch" } as DiscoverySnapshot);
+      await expect(view.checkChannel(watched)).resolves.toMatchObject({ live: false, offlineConfirmed: true });
+    });
+
+    it("forgets a stream-down push after ten minutes", () => {
+      const discoveryState = new TwitchDiscoveryState();
+      discoveryState.recordPlaybackNotice({ type: "stream-down", channelId: "123" }, 0);
+      expect(discoveryState.streamDownReported("123", 10 * 60_000)).toBe(true);
+      expect(discoveryState.streamDownReported("123", 10 * 60_000 + 1)).toBe(false);
+    });
   });
 
   it("uses a progress-confirmed override for single-channel availability", async () => {

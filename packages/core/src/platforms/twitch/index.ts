@@ -7,21 +7,25 @@ import type { TwitchIntegrity } from "../../core/twitchIntegrity";
 import { PendingWatcherDiagnostics, type HeartbeatResult, type TablessWatchController, type WatchContext } from "../../core/tablessWatch";
 import { StaleWhileRevalidateCache } from "../../core/staleCache";
 import type { WebSocketFactory } from "../../core/webSocket";
+import type { ChatPresenceClient } from "../../core/chatPresence";
+import { TwitchChatPresenceClient } from "./chatPresence";
 import { diagnostic, ignoreEvent, type AdapterOperationOptions, type CandidateChannelSelection, type ChannelPointsClaimOptions, type PageFetcher, type PlatformAdapter } from "../adapter";
-import { TwitchChannelPointsPushController } from "./channelPointsPush";
-import { campaignHasClaimableReward, mergeTwitchCampaignProgress, parseTwitchCampaigns, twitchCandidatesFromCampaign, twitchSubscriptionRewardEvidence, withCampaignStatus } from "./parser";
+import { TwitchChannelPointsPushController, type TwitchPlaybackNotice } from "./channelPointsPush";
+import { campaignHasClaimableReward, mergeTwitchCampaignProgress, parseTwitchCampaigns, twitchCandidatesFromCampaign, twitchStreamCategoryMatches, twitchSubscriptionRewardEvidence, withCampaignStatus } from "./parser";
 import type { ResolvedCompatibility, TwitchIdentity } from "../../compatibility/types";
 import { createTwitchHeartbeat } from "./heartbeat/factory";
 import { HLS_POLL_INTERVAL_MS, safeHlsFailure } from "./heartbeat/hls";
 import type { TwitchHeartbeatContext, TwitchHeartbeatExchange, TwitchHeartbeatFetchText, TwitchHeartbeatPost, TwitchHeartbeatStrategy } from "./heartbeat/types";
 import { createTwitchInventory } from "./inventory/factory";
 import type { TwitchInventoryCapability } from "./inventory/types";
+import { errorMessage } from "@lurkloot/shared/errors";
 
 export { createTwitchInventory } from "./inventory/factory";
 export type { TwitchInventoryCapability } from "./inventory/types";
 
 // Inline query: the viewer's own user id, needed for the minute-watched event.
 const CURRENT_USER_QUERY = "query CurrentUser { currentUser { id } }";
+const CURRENT_USER_LOGIN_QUERY = "query CurrentUserLogin { currentUser { id login } }";
 
 // Twitch's web Client-ID — the default identity. It is the one Twitch gates
 // behind Client-Integrity (Kasada); non-web client ids (Android/TV) are not.
@@ -43,6 +47,9 @@ const CHANNEL_CAMPAIGN_CACHE_MAX_ENTRIES = 128;
 // The follow list only breaks ties between eligible channels, so a stale minute
 // costs nothing while a fresh read on every tick would be a wasted request.
 const FOLLOWED_CHANNELS_CACHE_TTL_MS = 5 * 60_000;
+// How long a stream-down push vouches for an offline check (#759). A tick
+// follows the push within a minute; anything older is from another session.
+const STREAM_DOWN_HINT_TTL_MS = 10 * 60_000;
 // Followed channels that are live right now. Bounded generously: the preference
 // only matters for channels that also show up in a campaign's directory page.
 const FOLLOWED_CHANNELS_LIMIT = 100;
@@ -107,7 +114,11 @@ export interface TwitchAdapterOptions {
   // the browser WebSocket; headless runtimes omit it so live-event claiming
   // stays off without a socket.
   webSocketFactory?: WebSocketFactory;
-  // Reads the Twitch auth-token cookie. Injected so core stays browser-free
+  // Factory for the IRC chat presence socket alone, for a host that joins chat
+  // without Hermes (the CLI). Defaults to webSocketFactory.
+  chatWebSocketFactory?: WebSocketFactory;
+  // Reads the Twitch OAuth token: the auth-token cookie in the extension, the
+  // stored credential on the CLI. Injected so core stays browser-free
   // and never logs the value.
   getAuthToken?: () => Promise<string | undefined>;
   // CLI-only seed games for partial discovery when Twitch hides the campaign
@@ -188,7 +199,7 @@ const TWITCH_CAMPAIGN_FIELDS = `{
   detailsURL
   self { isAccountConnected }
   game { id name displayName slug boxArtURL }
-  allow { channels { id name } }
+  allow { isEnabled channels { id name } }
   timeBasedDrops {
     id
     name
@@ -212,7 +223,7 @@ const TWITCH_AVAILABLE_CAMPAIGN_FIELDS = `{
   accountLinkURL
   detailsURL
   game { id name displayName slug boxArtURL }
-  allow { channels { id name } }
+  allow { isEnabled channels { id name } }
   timeBasedDrops {
     id
     name
@@ -580,6 +591,24 @@ export class TwitchDiscoveryState {
   // self-contained value object. Not readonly only so setAuthenticatedUser can
   // swap it wholesale — see there for why replacing beats clearing in place.
   followedChannels = new StaleWhileRevalidateCache<string[]>(FOLLOWED_CHANNELS_CACHE_TTL_MS);
+  // When the Hermes playback topic last said each channel's stream ended
+  // (#759). Lives here because the push outlives the per-tick adapter.
+  private readonly streamDownAt = new Map<string, number>();
+
+  recordPlaybackNotice(notice: TwitchPlaybackNotice, now = Date.now()): void {
+    if (notice.type === "stream-down") this.streamDownAt.set(notice.channelId, now);
+    else this.streamDownAt.delete(notice.channelId);
+  }
+
+  // Whether a recent stream-down push, not cancelled by a stream-up, says
+  // this channel's stream ended.
+  streamDownReported(channelId: string, now = Date.now()): boolean {
+    const at = this.streamDownAt.get(channelId);
+    if (at === undefined) return false;
+    if (now - at <= STREAM_DOWN_HINT_TTL_MS) return true;
+    this.streamDownAt.delete(channelId);
+    return false;
+  }
 
   // Returns whether this call cleared caches for an identity switch, so the
   // caller can log it. A boolean rather than an invalidated-entry count: a
@@ -1014,6 +1043,7 @@ export class TwitchAdapter implements PlatformAdapter {
   platform = "twitch" as const;
   readonly compatibility?: ResolvedCompatibility["twitch"];
   readonly createChannelPointsPushController?: () => TwitchChannelPointsPushController;
+  readonly createChatPresenceClient?: () => ChatPresenceClient;
 
   async checkAuthHealth(signal?: AbortSignal): Promise<PlatformAuthHealth> {
     const checkedAt = new Date().toISOString();
@@ -1089,13 +1119,23 @@ export class TwitchAdapter implements PlatformAdapter {
     this.gqlTransport = createTwitchGqlTransport(fetcher, options);
     this.inventoryCapability = createTwitchInventory(options.compatibility.inventory);
     const createWebSocket = options.webSocketFactory;
+    const createChatWebSocket = options.chatWebSocketFactory ?? createWebSocket;
     const getAuthToken = options.getAuthToken;
     if (createWebSocket && getAuthToken) {
+      const discoveryState = this.discoveryState;
       this.createChannelPointsPushController = () => new TwitchChannelPointsPushController({
         createWebSocket,
         getAuthToken,
         resolveUserId: () => this.resolveViewerUserId(),
         clientId: this.options.clientId,
+        observePlayback: (notice) => discoveryState.recordPlaybackNotice(notice),
+      });
+    }
+    if (createChatWebSocket && getAuthToken) {
+      this.createChatPresenceClient = () => new TwitchChatPresenceClient({
+        createWebSocket: createChatWebSocket,
+        getAuthToken,
+        resolveLogin: () => this.resolveViewerLogin(),
       });
     }
   }
@@ -1132,7 +1172,7 @@ export class TwitchAdapter implements PlatformAdapter {
       } catch (error) {
         signal?.throwIfAborted();
         if (authHealthFromError(error)) throw error;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         diagnostic(
           this.emit,
           "warn",
@@ -1363,7 +1403,7 @@ export class TwitchAdapter implements PlatformAdapter {
       const retained = authenticatedUserId
         ? this.discoveryState.retainedCampaignDetails(dropID)
         : undefined;
-      const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      const message = errorMessage(result.reason);
       diagnostic(
         this.emit,
         "warn",
@@ -1436,23 +1476,13 @@ export class TwitchAdapter implements PlatformAdapter {
       const gameName = game.name;
       let directory: TwitchGqlResponse<TwitchDirectoryData>;
       try {
-        directory = await this.gqlWithIntegrityRetry<TwitchDirectoryData>("DirectoryPage_Game", TWITCH_QUERIES.gameDirectoryHash, {
-          slug: slugs.get(game) ?? twitchSlugFromName(gameName),
-          imageWidth: 50,
-          includeCostreaming: false,
-          options: {
-            sort: "VIEWER_COUNT", broadcasterLanguages: [], includeRestricted: ["SUB_ONLY_LIVE"],
-            recommendationsContext: { platform: "web" }, requestID: crypto.randomUUID(),
-            freeformTags: null, systemFilters: ["DROPS_ENABLED"], tags: [],
-          },
-          sortTypeIsRecency: false, limit: 8,
-        }, undefined, undefined, this.emit, signal);
+        directory = await this.fetchGameDirectory(slugs.get(game) ?? twitchSlugFromName(gameName), 8, signal);
         successfulDirectories += 1;
       } catch (error) {
         signal?.throwIfAborted();
         if (authHealthFromError(error)) throw error;
         lastDirectoryError = error;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         diagnostic(this.emit, "warn", `Twitch live-channel directory for ${gameName} failed: ${message}`, "twitch");
         continue;
       }
@@ -1473,7 +1503,7 @@ export class TwitchAdapter implements PlatformAdapter {
           signal?.throwIfAborted();
           if (authHealthFromError(error)) throw error;
           lastLookupError = error;
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           diagnostic(this.emit, "warn", `Twitch live-channel campaigns for ${broadcaster.login} failed: ${message}`, "twitch");
           continue;
         }
@@ -1506,6 +1536,26 @@ export class TwitchAdapter implements PlatformAdapter {
   // Looks up configured games' slugs by id in one anonymous request (public
   // data, so no integrity token), caching them for this adapter. A failed
   // lookup falls back to deriving the slug from the name.
+  private fetchGameDirectory(slug: string | undefined, limit: number, signal?: AbortSignal): Promise<TwitchGqlResponse<TwitchDirectoryData>> {
+    return this.gqlWithIntegrityRetry<TwitchDirectoryData>("DirectoryPage_Game", TWITCH_QUERIES.gameDirectoryHash, {
+      slug,
+      imageWidth: 50,
+      includeCostreaming: false,
+      options: {
+        sort: "VIEWER_COUNT",
+        broadcasterLanguages: [],
+        includeRestricted: ["SUB_ONLY_LIVE"],
+        recommendationsContext: { platform: "web" },
+        requestID: crypto.randomUUID(),
+        freeformTags: null,
+        systemFilters: ["DROPS_ENABLED"],
+        tags: [],
+      },
+      sortTypeIsRecency: false,
+      limit,
+    }, undefined, undefined, this.emit, signal);
+  }
+
   private async resolveGameSlugs(
     games: readonly { id?: string; name: string; slug?: string }[],
     signal?: AbortSignal,
@@ -1529,7 +1579,7 @@ export class TwitchAdapter implements PlatformAdapter {
         }
       } catch (error) {
         signal?.throwIfAborted();
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         diagnostic(this.emit, "warn", `Twitch game slug lookup failed; deriving slugs from names: ${message}`, "twitch");
       }
       for (const game of games) {
@@ -1705,23 +1755,7 @@ export class TwitchAdapter implements PlatformAdapter {
     if (aclCandidates.length > 0) return aclCandidates;
     if (!campaign.slug && !campaign.categoryId) return [];
 
-    const response = await this.gqlWithIntegrityRetry<TwitchDirectoryData>("DirectoryPage_Game", TWITCH_QUERIES.gameDirectoryHash, {
-      slug: campaign.slug ?? campaign.gameName,
-      imageWidth: 50,
-      includeCostreaming: false,
-      options: {
-        sort: "VIEWER_COUNT",
-        broadcasterLanguages: [],
-        includeRestricted: ["SUB_ONLY_LIVE"],
-        recommendationsContext: { platform: "web" },
-        requestID: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`,
-        freeformTags: null,
-        systemFilters: ["DROPS_ENABLED"],
-        tags: [],
-      },
-      sortTypeIsRecency: false,
-      limit: 25,
-    }, undefined, undefined, this.emit, signal);
+    const response = await this.fetchGameDirectory(campaign.slug ?? campaign.gameName, 25, signal);
 
     return (response.data?.game?.streams?.edges ?? [])
       .map((edge): ChannelCandidate | undefined => {
@@ -1806,7 +1840,7 @@ export class TwitchAdapter implements PlatformAdapter {
       diagnostic(
         this.emit,
         "debug",
-        `Twitch followed-channel lookup failed (${error instanceof Error ? error.message : String(error)}); channel preference falls back to viewer count`,
+        `Twitch followed-channel lookup failed (${errorMessage(error)}); channel preference falls back to viewer count`,
         "twitch",
       );
       return [];
@@ -1831,11 +1865,14 @@ export class TwitchAdapter implements PlatformAdapter {
     let trustedDirectoryCandidates = 0;
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index];
-      if (candidate.live === true && candidate.isAclMatch === false && candidate.broadcastId) {
+      // A listing that says live is trusted, unless a stream-down push says the
+      // stream since ended (#759): then the stream is checked.
+      if (candidate.live === true && candidate.isAclMatch === false && candidate.broadcastId
+        && !this.streamEndReported(candidate.channelId)) {
         trustedDirectoryCandidates += 1;
         checks[index] = {
           live: true,
-          categoryMatches: !campaign?.categoryId || candidate.categoryId === campaign.categoryId,
+          categoryMatches: twitchStreamCategoryMatches(candidate.categoryId, campaign),
           candidate,
         };
       } else {
@@ -2126,7 +2163,7 @@ export class TwitchAdapter implements PlatformAdapter {
     } catch (error) {
       signal?.throwIfAborted();
       if (authHealthFromError(error)) throw error;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       for (const [index, candidate] of candidates.entries()) {
         diagnostic(
           this.emit,
@@ -2243,7 +2280,7 @@ export class TwitchAdapter implements PlatformAdapter {
       signal?.throwIfAborted();
       const checks: ChannelCheck[] = [];
       for (const candidate of candidates) {
-        checks.push(await this.checkChannel(candidate, { signal }));
+        checks.push(await this.checkChannel(candidate, { campaign, signal }));
       }
       return { checks, singleFallbacks: candidates.length };
     }
@@ -2254,14 +2291,15 @@ export class TwitchAdapter implements PlatformAdapter {
       const response = normalizeTwitchGqlResponse<TwitchStreamInfoData>(responses[index]);
       if (!response?.data?.user || response.errors?.length || response.error) {
         singleFallbacks += 1;
-        checks.push(await this.checkChannel(candidate, { signal }));
+        checks.push(await this.checkChannel(candidate, { campaign, signal }));
         continue;
       }
       const stream = response.data.user.stream;
       const categoryId = stream?.game?.id;
       checks.push({
         live: Boolean(stream),
-        categoryMatches: !campaign?.categoryId || categoryId === campaign.categoryId,
+        ...(!stream && this.streamEndReported(response.data.user.id ?? candidate.channelId) ? { offlineConfirmed: true } : {}),
+        categoryMatches: twitchStreamCategoryMatches(categoryId, campaign),
         candidate: {
           ...candidate,
           displayName: response.data.user.displayName ?? candidate.displayName,
@@ -2275,6 +2313,12 @@ export class TwitchAdapter implements PlatformAdapter {
       });
     }
     return { checks, singleFallbacks };
+  }
+
+  // Whether the Hermes playback topic said this channel's stream ended (#759).
+  // An offline check it agrees with ends the watch at once (offlineConfirmed).
+  private streamEndReported(channelId: string | undefined): boolean {
+    return channelId !== undefined && this.discoveryState.streamDownReported(channelId);
   }
 
   async checkChannel(
@@ -2296,8 +2340,7 @@ export class TwitchAdapter implements PlatformAdapter {
       const stream = response.data?.user?.stream;
       const channelId = response.data?.user?.id;
       const actualCategoryId = stream?.game?.id;
-      const expectedCategoryId = campaign?.categoryId ?? channel.categoryId;
-      const categoryMatches = !expectedCategoryId || actualCategoryId === expectedCategoryId;
+      const categoryMatches = twitchStreamCategoryMatches(actualCategoryId, campaign, channel.categoryId);
       const broadcastId = stream?.id;
       // Gated on strict validation for the same reason as selectCandidateChannel:
       // this path also re-verifies the channel already being watched, so an
@@ -2308,6 +2351,7 @@ export class TwitchAdapter implements PlatformAdapter {
         : undefined;
       return {
         live: Boolean(stream),
+        ...(!stream && this.streamEndReported(channelId ?? channel.channelId) ? { offlineConfirmed: true } : {}),
         categoryMatches,
         campaignMatches,
         reason: !stream
@@ -2383,7 +2427,7 @@ export class TwitchAdapter implements PlatformAdapter {
     } catch (error) {
       signal?.throwIfAborted();
       if (authHealthFromError(error)) throw error;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       diagnostic(
         this.emit,
         "debug",
@@ -2452,7 +2496,7 @@ export class TwitchAdapter implements PlatformAdapter {
     } catch (error) {
       signal?.throwIfAborted();
       if (authHealthFromError(error)) throw error;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       diagnostic(this.emit, "warn", `Twitch drops dashboard request failed; reusing the last campaign list it returned: ${message}`, "twitch");
       return { response: {}, ok: false };
     }
@@ -2490,7 +2534,7 @@ export class TwitchAdapter implements PlatformAdapter {
     try {
       return invalidateOnClaim(await this.runClaim(reward, signal));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       // Only integrity rejections are worth a refresh + retry; everything else
       // (e.g. an unexpected status or a stale id) propagates unchanged.
       if (!isIntegrityRejection(error)) throw error;
@@ -2607,10 +2651,22 @@ export class TwitchAdapter implements PlatformAdapter {
       );
       return response.data?.currentUser?.id;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       diagnostic(this.emit, "warn", `Could not resolve the Twitch viewer id for channel-points push: ${message}`, "twitch");
       return undefined;
     }
+  }
+
+  // A failure propagates: the chat presence client reports it through its own
+  // diagnostics, which outlive the reconcile that created this adapter.
+  private async resolveViewerLogin(): Promise<string | undefined> {
+    const response = await this.gqlWithIntegrityRetry<{ currentUser?: { login?: string } }>(
+      "CurrentUserLogin",
+      "",
+      {},
+      CURRENT_USER_LOGIN_QUERY,
+    );
+    return response.data?.currentUser?.login;
   }
 
   private async mergeCurrentSessionProgress(
@@ -2706,7 +2762,7 @@ export class TwitchAdapter implements PlatformAdapter {
       }));
     } catch (error) {
       signal?.throwIfAborted();
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       diagnostic(this.emit, "warn", `Could not merge current session progress for ${channel.username}: ${message}`, "twitch");
       return campaigns;
     }
@@ -2761,7 +2817,7 @@ export class TwitchAdapter implements PlatformAdapter {
     originalError: unknown,
     signal?: AbortSignal,
   ): Promise<ChannelCheck> {
-    const originalMessage = originalError instanceof Error ? originalError.message : String(originalError);
+    const originalMessage = errorMessage(originalError);
     diagnostic(this.emit, "debug", `Channel GQL check failed for ${channel.username}, falling back to the channel page: ${originalMessage}`, "twitch");
     try {
       const page = await this.fetcher.fetchJson<{ html?: string }>(channel.url, { signal }, this.emit);
@@ -2771,10 +2827,10 @@ export class TwitchAdapter implements PlatformAdapter {
         diagnostic(this.emit, "debug", `Channel page for ${channel.username} showed no live signal; treating as offline`, "twitch");
       }
       const actualCategoryId = parseGameId(html);
-      const expectedCategoryId = campaign?.categoryId ?? channel.categoryId;
       return {
         live,
-        categoryMatches: !expectedCategoryId || actualCategoryId == null || actualCategoryId === expectedCategoryId,
+        categoryMatches: actualCategoryId == null
+          || twitchStreamCategoryMatches(actualCategoryId, campaign, channel.categoryId),
         reason: "Twitch GQL check failed; used channel page fallback",
         candidate: {
           ...channel,
@@ -3045,7 +3101,7 @@ class TwitchWatcher implements TablessWatchController {
       this.viewerUserId = response.data?.currentUser?.id;
     } catch (error) {
       // Leave unresolved; tick() reports the missing-user case to the scheduler.
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       this.log("warn", `Could not resolve the Twitch viewer id for tabless watching: ${message}`);
     }
     return this.viewerUserId;

@@ -1,6 +1,7 @@
 import type { EngineSettings } from "@lurkloot/shared/models";
 import { createAuthHealth } from "./authHealth";
 import { createChannelPoints } from "./channelPoints";
+import { createChatPresence } from "./chatPresence";
 import { createClaimService } from "./claimService";
 import {
   createDiscoverySignalSlice,
@@ -113,6 +114,7 @@ export function createBackgroundController<S extends EngineSettings = EngineSett
     ...createHeartbeatCoordinator(ports, transaction, { lifecycleSlice, tabRegistry }, calls),
     ...createTwitchIntegrity(ports, { lifecycleSlice, tabRegistry, policySlice }, calls),
     ...createChannelPoints(ports, transaction, { lifecycleSlice }, calls),
+    ...createChatPresence(ports, transaction, { lifecycleSlice }, calls),
     ...createKickRuntime(ports, transaction, { lifecycleSlice }, calls),
     ...createAuthHealth(ports, calls),
     ...createManualWatch(ports, { tabRegistry, lifecycleSlice }, calls),
@@ -162,6 +164,10 @@ export function createBackgroundController<S extends EngineSettings = EngineSett
     discoverySnapshot: calls.discoverySnapshot,
     runWatchHeartbeat: calls.runWatchHeartbeat,
     runTwitchChannelPointsClaim: calls.runTwitchChannelPointsClaim,
+    // Re-reconciles the Twitch channel-points job and Hermes observer against
+    // the stored settings and state, for host state they read that changed
+    // between ticks (a Twitch Extension session became ready, #757).
+    reconcileTwitchObservers: () => calls.rescheduleTwitchChannelPointsJob(),
     runDropClaims: calls.runDropClaims,
     runKickChallengeClaims: calls.runKickChallengeClaims,
     runClaimHandoff: calls.runClaimHandoff,

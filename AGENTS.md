@@ -105,10 +105,18 @@ Do not add features that store credentials, export cookies, or bypass platform d
 The headless CLI is the one deliberate exception, kept as narrow as possible (#653). Since September 2026 Twitch accepts device login only from clients that cannot see the campaign list, so full CLI discovery needs the web client and a Kasada integrity token:
 
 - The CLI may keep its own device-login and imported credentials in its private auth store.
-- The extension's Settings → Export credentials, a user-confirmed action, may export the Twitch and Kick login cookies plus Twitch's Kasada session cookie (`KP_UIDz-ssn`). It reads that cookie through the optional `https://k.twitchcdn.net/*` permission, requested only by the export, never as a required permission.
+- The extension's Settings → Export credentials, a user-confirmed action, may export the Twitch and Kick login cookies plus Twitch's Kasada session cookie (`KP_UIDz-ssn`). It reads that cookie from `k.twitchcdn.net`, covered by the required `https://*.twitchcdn.net/*` host permission.
 - The CLI may mint Twitch web Client-Integrity from that cookie without a browser.
 
 Nothing else may export cookies or evade detection, and the extension itself never uses the Kasada cookie while farming.
+
+The extension never presents its own `chrome-extension://` or `moz-extension://` origin to Twitch or Kick (#754, #792). This is the one header exception, and it is narrow (docs/architecture.md, "Platform Origins and the Socket Host"):
+
+- Only `Origin` is ever rewritten, to the platform's own site (`https://www.twitch.tv`, `https://kick.com`), and only on requests and sockets the extension itself initiates to the platforms' domains. An opted-in Twitch Extension provider's own socket backend (`backendSocketOrigin`, Fortnite today) presents that extension's Twitch frame origin, `https://<extension-id>.ext-twitch.tv` (#798). Never rewrite other identity headers (`User-Agent`, `Referer`, cookies, client hints).
+- HTTP: dynamic declarativeNetRequest rules (`packages/extension/src/core/platformRequestOrigin.ts`, `declarativeNetRequestWithHostAccess`) on non-GET/HEAD requests.
+- Sockets on Chrome: every platform socket opens in the offscreen socket host's Worker (`entrypoints/socketHost/`, the `offscreen` permission), where websocket-only DNR rules reach them; Chrome never applies DNR to a service-worker socket. The host opens only the URLs in `src/core/socketProfiles.ts`, reads no cookies or credentials, never sends anything the worker did not, and drops chat before it crosses to the worker. The worker mints every token through the platforms' own APIs.
+- Sockets on Firefox: a blocking `webRequest` listener (`src/core/platformSocketOrigin.ts`, `webRequestBlocking`) on the background page's own sockets only.
+- A socket whose Origin cannot be set stays closed (`src/core/socketAdmission.ts`). A new platform socket needs a profile, its `wss://` host permission, and a domain in the socket rules.
 
 ## Manually Reproducing Platform GQL Requests
 

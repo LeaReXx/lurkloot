@@ -25,6 +25,7 @@ import type {
   TickDiagnosticContext,
   TickTrigger,
 } from "./types";
+import { errorMessage } from "@lurkloot/shared/errors";
 
 // One platform tick: selection, the scheduler tick and what runs around it.
 export function createTickRun<S extends EngineSettings>(
@@ -43,6 +44,7 @@ export function createTickRun<S extends EngineSettings>(
     | "prepareSelection"
     | "reselectUnderLock"
     | "discoverySignalEpochs"
+    | "chatPresenceEpochs"
     | "observeTickCycle"
     | "reserveTablessWatchers"
     | "recordWaitingClaimRewardIds"
@@ -89,6 +91,7 @@ export function createTickRun<S extends EngineSettings>(
     prepareSelection,
     reselectUnderLock,
     discoverySignalEpochs,
+    chatPresenceEpochs,
     observeTickCycle,
     reserveTablessWatchers,
     recordWaitingClaimRewardIds,
@@ -171,7 +174,7 @@ export function createTickRun<S extends EngineSettings>(
       try {
         await releaseUncommittedWatchTabs(platform);
       } catch (error) {
-        diagnosticEvent("warn", `Could not release uncommitted watch tabs: ${error instanceof Error ? error.message : String(error)}`, platform, tickContext);
+        diagnosticEvent("warn", `Could not release uncommitted watch tabs: ${errorMessage(error)}`, platform, tickContext);
       }
       for (const adapter of Object.values(tickAdapters)) adapter.close();
       tickSlice.activeTicks.delete(abort);
@@ -612,6 +615,7 @@ export function createTickRun<S extends EngineSettings>(
               observerEpochs: {
                 discoverySignals: discoverySignalEpochs(schedulerPlatforms),
                 channelPointsPush: twitchChannelPointsPushEpoch(),
+                chatPresence: chatPresenceEpochs(schedulerPlatforms),
               },
               correlate: (hookEvents) => correlateTickDiagnostics(hookEvents, tickContext),
               follow: (work) => {

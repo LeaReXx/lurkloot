@@ -375,6 +375,15 @@ export function buildSettingsRegistry(ctx: SettingsRegistryContext): SettingsSec
         render: () => <SettingRow title={t("autoClaimChallengesTitle")} description={t("autoClaimChallengesDescription")} checked={settings.platform.kick.autoClaimChallenges} onChange={(value) => void onSettingsChange({ platform: { kick: { autoClaimChallenges: value } } })} />,
       };
 
+    // Kick presence needs the Chrome offscreen relay (#754); on a host
+    // without it the background warns once that the setting has no effect.
+    const chatEntry: SettingsEntryDef = {
+      id: `${platform}.alwaysEnterChat`,
+      titleKey: "alwaysEnterChatTitle",
+      descriptionKey: "alwaysEnterChatDescription",
+      render: () => <SettingRow title={t("alwaysEnterChatTitle")} description={t("alwaysEnterChatDescription")} checked={settings.platform[platform].alwaysEnterChat === true} onChange={(value) => void onSettingsChange({ platform: { [platform]: { alwaysEnterChat: value } } }, { tickAfterSave: true, tickAfterSavePlatforms: [platform] })} />,
+    };
+
     const groups: SettingsGroupDef[] = [
       {
         id: `${platform}.watchSourcePriority`,
@@ -504,7 +513,7 @@ export function buildSettingsRegistry(ctx: SettingsRegistryContext): SettingsSec
     return {
       id: platform,
       description: t(platform === "twitch" ? "twitchSectionDescription" : "kickSectionDescription"),
-      rows: [claimEntry],
+      rows: [claimEntry, chatEntry],
       groups,
     };
   };

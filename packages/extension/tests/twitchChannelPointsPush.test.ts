@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TwitchChannelPointsPushController } from "@lurkloot/core/twitch/channelPointsPush";
 import type { WebSocketLike, WebSocketMessageEventLike } from "@lurkloot/core/webSocket";
+import { TwitchDiscoveryState } from "@lurkloot/core/twitch";
 import { twitchAdapter } from "./helpers/adapters";
 
 const liveControllers: TwitchChannelPointsPushController[] = [];
@@ -385,6 +386,34 @@ describe("Twitch channel-points push", () => {
     });
   });
 
+  it("logs what a points event was, so a watch's earnings show in diagnostics", async () => {
+    const socket = new FakeSocket();
+    const controller = createPushController({
+      createWebSocket: () => socket,
+      getAuthToken: async () => "token",
+      resolveUserId: async () => "78020132",
+    });
+    await handshake(socket, controller, vi.fn());
+    const subscriptionId = currentSubscriptionId(socket);
+
+    socket.message(pubsubNotification(subscriptionId, {
+      type: "points-earned",
+      data: {
+        channel_id: "119415848",
+        point_gain: { reason_code: "WATCH", total_points: 10 },
+        balance: { balance: 4200 },
+      },
+    }));
+    socket.message(pubsubNotification(subscriptionId, { type: "claim-claimed", data: {} }));
+    socket.message(pubsubNotification(subscriptionId, { type: "<script>", data: {} }));
+
+    const logged = JSON.stringify(controller.drainEvents());
+    expect(logged).toContain("Ignored Twitch channel-points push notification (points-earned: WATCH +10 on channel 119415848)");
+    expect(logged).toContain("Ignored Twitch channel-points push notification (claim-claimed)");
+    expect(logged).not.toContain("4200");
+    expect(logged).not.toContain("<script>");
+  });
+
   it("ignores malformed, incomplete, claimed, and foreign notifications", async () => {
     const socket = new FakeSocket();
     const onClaim = vi.fn();
@@ -734,6 +763,210 @@ describe("keepalive, reconnect, and stop", () => {
   });
 });
 
+// #759: the same connection follows the watched channel's playback topic.
+describe("Twitch playback push", () => {
+  type SubscribeFrame = { id: string; subscribe: { id: string; pubsub?: { topic: string }; extension?: { topic: string } } };
+  const subscribes = (socket: FakeSocket) => parsedSent(socket).filter((frame) => frame.type === "subscribe") as SubscribeFrame[];
+  const topicOf = (frame: SubscribeFrame) => frame.subscribe.pubsub?.topic ?? frame.subscribe.extension?.topic;
+  const topics = (socket: FakeSocket) => subscribes(socket).map(topicOf);
+  const confirm = (socket: FakeSocket, topic: string, result: unknown = "ok") => {
+    const frame = subscribes(socket).filter((candidate) => topicOf(candidate) === topic).at(-1)!;
+    socket.message({ type: "subscribeResponse", subscribeResponse: { subscription: { id: frame.subscribe.id }, result }, parentId: frame.id });
+    return frame.subscribe.id;
+  };
+  async function connected(owners: Parameters<TwitchChannelPointsPushController["start"]>[0]) {
+    const socket = new FakeSocket();
+    const reconnect = reconnectScheduler();
+    const controller = createPushController({
+      createWebSocket: () => socket,
+      getAuthToken: async () => "auth-token-value",
+      resolveUserId: async () => "78020132",
+      scheduleReconnect: reconnect.scheduleReconnect,
+      cancelReconnect: reconnect.cancelReconnect,
+      scheduleKeepAlive: keepAliveScheduler().scheduleKeepAlive,
+    });
+    await controller.start(owners);
+    socket.message(WELCOME);
+    const authenticate = JSON.parse(socket.sent[0]!);
+    socket.message({ type: "authenticateResponse", authenticateResponse: { result: "ok" }, parentId: authenticate.id });
+    return { socket, controller, reconnect };
+  }
+
+  it("subscribes the watched channel's playback topic alongside the claims topic", async () => {
+    const { socket, controller } = await connected({ onClaimAvailable: () => undefined, playback: { channelId: "123", onNotice: () => undefined } });
+    expect(topics(socket)).toEqual(["community-points-user-v1.78020132", "video-playback-by-id.123"]);
+    confirm(socket, "community-points-user-v1.78020132");
+    expect(controller.subscribed).toBe(true);
+  });
+
+  it("follows playback alone without the claims topic", async () => {
+    const { socket, controller } = await connected({ playback: { channelId: "123", onNotice: () => undefined } });
+    expect(topics(socket)).toEqual(["video-playback-by-id.123"]);
+    confirm(socket, "video-playback-by-id.123");
+    expect(controller.subscribed).toBe(false);
+  });
+
+  it("reports stream-up and stream-down for the watched channel and drops the rest", async () => {
+    const onNotice = vi.fn();
+    const { socket, controller } = await connected({ playback: { channelId: "123", onNotice } });
+    const id = confirm(socket, "video-playback-by-id.123");
+    socket.message(pubsubNotification(id, { type: "viewcount", server_time: 1, viewers: 10 }));
+    socket.message(pubsubNotification(id, { type: "commercial", server_time: 1, length: 30 }));
+    socket.message(pubsubNotification(id, "{not json"));
+    socket.message(pubsubNotification(id, { type: "stream-down", server_time: 2 }));
+    socket.message(pubsubNotification(id, { type: "stream-up", server_time: 3, play_delay: 0 }));
+    expect(onNotice.mock.calls).toEqual([[{ type: "stream-down", channelId: "123" }], [{ type: "stream-up", channelId: "123" }]]);
+    // Viewer counts arrive every few seconds; they leave no diagnostic.
+    expect(controller.drainEvents().filter((event) => "message" in event && /Ignored/.test(String(event.message)))).toEqual([]);
+  });
+
+  it("switches channels by subscribing the new topic before leaving the old one", async () => {
+    const onNotice = vi.fn();
+    const { socket, controller } = await connected({ playback: { channelId: "123", onNotice } });
+    const old = confirm(socket, "video-playback-by-id.123");
+    await controller.start({ playback: { channelId: "456", onNotice } });
+    const sent = parsedSent(socket).slice(-2);
+    expect(sent.map((frame) => frame.type)).toEqual(["subscribe", "unsubscribe"]);
+    expect(sent[1]).toMatchObject({ unsubscribe: { id: old } });
+    const next = confirm(socket, "video-playback-by-id.456");
+    socket.message(pubsubNotification(old, { type: "stream-down" }));
+    socket.message(pubsubNotification(next, { type: "stream-down" }));
+    expect(onNotice.mock.calls).toEqual([[{ type: "stream-down", channelId: "456" }]]);
+  });
+
+  it("leaves the playback topic when the watch ends, keeping the claims topic", async () => {
+    const onClaimAvailable = vi.fn();
+    const { socket, controller } = await connected({ onClaimAvailable, playback: { channelId: "123", onNotice: () => undefined } });
+    confirm(socket, "community-points-user-v1.78020132");
+    const playback = confirm(socket, "video-playback-by-id.123");
+    await controller.start({ onClaimAvailable });
+    expect(parsedSent(socket).at(-1)).toMatchObject({ type: "unsubscribe", unsubscribe: { id: playback } });
+    expect(controller.subscribed).toBe(true);
+    expect(socket.closed).toBe(false);
+  });
+
+  it("keeps the connection when Hermes refuses the playback topic, and does not retry it", async () => {
+    const { socket, controller, reconnect } = await connected({ onClaimAvailable: () => undefined, playback: { channelId: "123", onNotice: () => undefined } });
+    confirm(socket, "community-points-user-v1.78020132");
+    confirm(socket, "video-playback-by-id.123", "error");
+    expect(socket.closed).toBe(false);
+    expect(reconnect.scheduled).toHaveLength(0);
+    expect(controller.subscribed).toBe(true);
+    await controller.start({ onClaimAvailable: () => undefined, playback: { channelId: "123", onNotice: () => undefined } });
+    expect(topics(socket).filter((topic) => topic === "video-playback-by-id.123")).toHaveLength(1);
+  });
+
+  const NOPIXEL_TOPIC = "channel-ext-v1.123-nstuq90nghenyqwqme61jgvmtp253a-broadcast";
+  const broadcastOwner = (onEvent: (event: string) => void, channelId = "123") =>
+    ({ channelId, extensionId: "nstuq90nghenyqwqme61jgvmtp253a", token: "extension-jwt", onEvent });
+
+  it("follows an extension's broadcast topic and passes on only event names", async () => {
+    const onEvent = vi.fn();
+    const { socket, controller } = await connected({
+      onClaimAvailable: () => undefined,
+      playback: { channelId: "123", onNotice: () => undefined },
+      extensionBroadcast: broadcastOwner(onEvent),
+    });
+    expect(topics(socket)).toEqual(["community-points-user-v1.78020132", "video-playback-by-id.123", NOPIXEL_TOPIC]);
+    // Hermes takes an extension topic only as an `extension` subscription with the extension's JWT.
+    const frame = parsedSent(socket).find((sent) => (sent.subscribe as { type?: string } | undefined)?.type === "extension") as
+      { id: string; subscribe: { id: string; extension: { topic: string; token: string } } };
+    expect(frame.subscribe.extension).toEqual({ topic: NOPIXEL_TOPIC, token: "extension-jwt" });
+    socket.message({ type: "subscribeResponse", subscribeResponse: { subscription: { id: frame.subscribe.id }, result: "ok" }, parentId: frame.id });
+    const id = frame.subscribe.id;
+    // Twitch wraps extension messages in a content list; the overlay sends {event, payload}.
+    socket.message(pubsubNotification(id, { content: [JSON.stringify({ event: "cards.giveaway.started", payload: { secret: "payload-value" } })], content_type: "application/json" }));
+    socket.message(pubsubNotification(id, { event: "cards.giveaway.ended", payload: { winners: ["1"] } }));
+    socket.message(pubsubNotification(id, { content: ["not json", JSON.stringify({ event: "Bad Event!" })] }));
+    socket.message(pubsubNotification(id, "{not json"));
+    expect(onEvent.mock.calls).toEqual([["cards.giveaway.started"], ["cards.giveaway.ended"]]);
+    const messages = controller.drainEvents().map((event) => String("message" in event ? event.message : ""));
+    expect(messages.filter((message) => message === "Ignored an unrecognised Twitch Extension broadcast message")).toHaveLength(2);
+    expect(JSON.stringify(messages)).not.toContain("payload-value");
+  });
+
+  it("keeps the connection when Hermes refuses an extension broadcast topic, and does not retry it", async () => {
+    const { socket, controller, reconnect } = await connected({ onClaimAvailable: () => undefined, extensionBroadcast: broadcastOwner(() => undefined) });
+    confirm(socket, "community-points-user-v1.78020132");
+    confirm(socket, NOPIXEL_TOPIC, "error");
+    expect(socket.closed).toBe(false);
+    expect(reconnect.scheduled).toHaveLength(0);
+    expect(controller.subscribed).toBe(true);
+    await controller.start({ onClaimAvailable: () => undefined, extensionBroadcast: broadcastOwner(() => undefined) });
+    expect(topics(socket).filter((topic) => topic === NOPIXEL_TOPIC)).toHaveLength(1);
+    // A different channel is a different topic, so it is tried.
+    await controller.start({ onClaimAvailable: () => undefined, extensionBroadcast: broadcastOwner(() => undefined, "456") });
+    expect(topics(socket)).toContain("channel-ext-v1.456-nstuq90nghenyqwqme61jgvmtp253a-broadcast");
+  });
+
+  it("does not follow the broadcast topic without an extension JWT, and retries a refused one with a renewed JWT", async () => {
+    const { socket, controller } = await connected({ onClaimAvailable: () => undefined, extensionBroadcast: { ...broadcastOwner(() => undefined), token: "" } });
+    expect(topics(socket)).not.toContain(NOPIXEL_TOPIC);
+    await controller.start({ onClaimAvailable: () => undefined, extensionBroadcast: broadcastOwner(() => undefined) });
+    confirm(socket, NOPIXEL_TOPIC, "error");
+    await controller.start({ onClaimAvailable: () => undefined, extensionBroadcast: { ...broadcastOwner(() => undefined), token: "renewed-jwt" } });
+    expect(topics(socket).filter((topic) => topic === NOPIXEL_TOPIC)).toHaveLength(2);
+  });
+
+  it("subscribes a revoked broadcast topic again with the current JWT", async () => {
+    const { socket, controller } = await connected({ playback: { channelId: "123", onNotice: () => undefined }, extensionBroadcast: broadcastOwner(() => undefined) });
+    const id = confirm(socket, NOPIXEL_TOPIC);
+    await controller.start({ playback: { channelId: "123", onNotice: () => undefined }, extensionBroadcast: { ...broadcastOwner(() => undefined), token: "renewed-jwt" } });
+    socket.message({ type: "subscriptionRevocation", subscriptionRevocation: { subscription: { id }, reason: "token expired" } });
+    const again = subscribes(socket).filter((frame) => topicOf(frame) === NOPIXEL_TOPIC);
+    expect(again).toHaveLength(2);
+    expect(again[1]!.subscribe).toMatchObject({ type: "extension", extension: { token: "renewed-jwt" } });
+    expect(socket.closed).toBe(false);
+  });
+
+  it("leaves the broadcast topic when the owner goes, and ignores its late messages", async () => {
+    const onEvent = vi.fn();
+    const { socket, controller } = await connected({ playback: { channelId: "123", onNotice: () => undefined }, extensionBroadcast: broadcastOwner(onEvent) });
+    const id = confirm(socket, NOPIXEL_TOPIC);
+    await controller.start({ playback: { channelId: "123", onNotice: () => undefined } });
+    expect(parsedSent(socket).at(-1)).toMatchObject({ type: "unsubscribe", unsubscribe: { id } });
+    socket.message(pubsubNotification(id, { event: "cards.giveaway.started" }));
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("follows playback when the viewer id lookup fails", async () => {
+    const socket = new FakeSocket();
+    const controller = createPushController({
+      createWebSocket: () => socket,
+      getAuthToken: async () => "auth-token-value",
+      resolveUserId: async () => { throw new Error("lookup failed"); },
+      scheduleKeepAlive: keepAliveScheduler().scheduleKeepAlive,
+    });
+    await controller.start({ playback: { channelId: "123", onNotice: () => undefined } });
+    socket.message(WELCOME);
+    socket.message({ type: "authenticateResponse", authenticateResponse: { result: "ok" }, parentId: JSON.parse(socket.sent[0]!).id });
+    expect(topics(socket)).toEqual(["video-playback-by-id.123"]);
+  });
+
+  it("subscribes the playback topic again after a reconnect", async () => {
+    const sockets = [new FakeSocket(), new FakeSocket()];
+    const reconnect = reconnectScheduler();
+    const controller = createPushController({
+      createWebSocket: () => sockets.shift()!,
+      getAuthToken: async () => "auth-token-value",
+      resolveUserId: async () => "78020132",
+      scheduleReconnect: reconnect.scheduleReconnect,
+      scheduleKeepAlive: keepAliveScheduler().scheduleKeepAlive,
+    });
+    const [first, second] = sockets;
+    await controller.start({ playback: { channelId: "123", onNotice: () => undefined } });
+    first!.message(WELCOME);
+    first!.message({ type: "authenticateResponse", authenticateResponse: { result: "ok" }, parentId: JSON.parse(first!.sent[0]!).id });
+    confirm(first!, "video-playback-by-id.123");
+    first!.emit("close");
+    reconnect.scheduled[0]!.callback();
+    await afterReconnect();
+    second!.message(WELCOME);
+    second!.message({ type: "authenticateResponse", authenticateResponse: { result: "ok" }, parentId: JSON.parse(second!.sent[0]!).id });
+    expect(topics(second!)).toEqual(["video-playback-by-id.123"]);
+  });
+});
+
 describe("Twitch channel-points push adapter factory", () => {
   it("exposes a Hermes observer only when websocket and auth token deps exist", () => {
     const fetcher = { fetchJson: async <T,>(): Promise<T> => ({}) as T };
@@ -746,5 +979,21 @@ describe("Twitch channel-points push adapter factory", () => {
     ).createChannelPointsPushController?.();
 
     expect(observer).toBeInstanceOf(TwitchChannelPointsPushController);
+  });
+
+  it("records playback notices in the discovery state the next adapter reads", async () => {
+    const fetcher = { fetchJson: async <T,>(): Promise<T> => ({ data: { currentUser: { id: "78020132" } } }) as T };
+    const discoveryState = new TwitchDiscoveryState();
+    const socket = new FakeSocket();
+    const observer = twitchAdapter(fetcher, undefined, { webSocketFactory: () => socket, getAuthToken: async () => "token", discoveryState })
+      .createChannelPointsPushController!();
+    liveControllers.push(observer);
+    await observer.start({ playback: { channelId: "123", onNotice: () => undefined } });
+    socket.message(WELCOME);
+    socket.message({ type: "authenticateResponse", authenticateResponse: { result: "ok" }, parentId: JSON.parse(socket.sent[0]!).id });
+    const subscribe = JSON.parse(socket.sent[1]!);
+    socket.message({ type: "subscribeResponse", subscribeResponse: { subscription: { id: subscribe.subscribe.id }, result: "ok" }, parentId: subscribe.id });
+    socket.message(pubsubNotification(subscribe.subscribe.id, { type: "stream-down" }));
+    expect(discoveryState.streamDownReported("123")).toBe(true);
   });
 });
