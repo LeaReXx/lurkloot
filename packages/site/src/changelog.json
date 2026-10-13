@@ -42,7 +42,8 @@
         "kind": "fixed",
         "text": "When a Twitch extension reward such as NoPixel V needs you to link your account, Lurkloot now pauses that reward and checks again later, instead of hopping between channels every minute. Channels that don't have the extension installed now show as Waiting instead of looking like an error."
       }
-    ]
+    ],
+    "date": "2026-10-13"
   },
   {
     "version": "1.16.0",
