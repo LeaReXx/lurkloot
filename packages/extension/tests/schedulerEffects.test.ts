@@ -18,6 +18,7 @@ import { createTickEffectExecutor } from "@lurkloot/core/background/tickEffects"
 import { registerWatchTabEffects } from "@lurkloot/core/background/manualWatch";
 import { registerSupplementalTargetEffect } from "@lurkloot/core/background/supplementalSources";
 import { createTabRegistry } from "@lurkloot/core/tabRegistry";
+import { UnusableWatchTabError } from "@lurkloot/core/watchTabError";
 import { DEFAULT_STATE } from "../src/core/storage";
 
 // The scheduler tick decides from plain inputs and names its side effects
@@ -319,5 +320,105 @@ describe("scheduler tick decisions from plain inputs", () => {
     });
 
     expect(tick.state.sessions.twitch).toMatchObject({ status: "error", reasonCode: "platform_error", errorChecks: 1, message: "tab refused" });
+  });
+
+  describe("a watch tab that did not show the channel page (#794)", () => {
+    const blocked = { kind: "security_policy_blocked" as const, reason: "Request blocked by security policy.", reference: "c0e117f5" };
+    const drops = () => [campaign("drops", [reward("first")])];
+
+    it("backs the platform off instead of marking authentication unhealthy", async () => {
+      const { tick } = await decide(input(drops(), channel("creator")), {
+        openWatchTab: () => {
+          throw new UnusableWatchTabError(9, blocked, { openedManagedTab: true });
+        },
+      });
+
+      expect(tick.state.authHealth.twitch.status).toBe("healthy");
+      expect(tick.state.sessions.twitch).toMatchObject({ status: "error", reasonCode: "platform_error", errorChecks: 1 });
+      expect(tick.state.sessions.twitch.retryAfter).toBeDefined();
+      expect(tick.state.sessions.twitch.message).toContain("Request blocked by security policy.");
+    });
+
+    it("counts a tab it opened only to reject as churn", async () => {
+      const { tick } = await decide(input(drops(), channel("creator")), {
+        openWatchTab: () => {
+          throw new UnusableWatchTabError(9, blocked, { openedManagedTab: true });
+        },
+      });
+
+      expect(tick.state.criticalHealth?.twitch?.managedTabOpens).toHaveLength(1);
+    });
+
+    it("stops a rejected tab it was reusing, so the retry loads a fresh page", async () => {
+      const reused = { platform: "twitch" as const, tabId: 4, channelUrl: channel("creator").url, ownedByExtension: true as const };
+      const watching = {
+        ...state,
+        sessions: { ...state.sessions, twitch: { ...state.sessions.twitch, status: "watching" as const, tabId: 4, tabManagedByExtension: true } },
+        managedWatchTabs: { twitch: reused },
+      };
+      const { tick, effects } = await decide(input(drops(), channel("creator"), { state: watching }), {
+        openWatchTab: () => {
+          throw new UnusableWatchTabError(4, blocked, { openedManagedTab: false });
+        },
+      });
+
+      expect(effects.map((effect) => effect.type)).toEqual(["claimRewards", "openWatchTab", "stopWatchTab"]);
+      expect(effects[2]).toMatchObject({ session: { tabId: 4, tabManagedByExtension: true } });
+      expect(tick.state.sessions.twitch).toMatchObject({ tabId: undefined, tabManagedByExtension: undefined });
+      expect(tick.state.managedWatchTabs?.twitch).toBeUndefined();
+      expect(tick.state.criticalHealth?.twitch?.managedTabOpens ?? []).toHaveLength(0);
+    });
+
+    it("does not reopen the tab on the next tick", async () => {
+      const first = await decide(input(drops(), channel("creator")), {
+        openWatchTab: () => {
+          throw new UnusableWatchTabError(9, blocked, { openedManagedTab: true });
+        },
+      });
+
+      const next = await decide(input(drops(), channel("creator"), { state: first.tick.state }));
+
+      expect(next.effects.map((effect) => effect.type)).not.toContain("openWatchTab");
+      expect(next.tick.state.sessions.twitch).toMatchObject({ status: "error", reasonCode: "platform_backoff" });
+    });
+
+    // Minute ticks for six hours against a block that never lifts. The backoff
+    // keeps the opens below the churn limit, so only the flag can end the loop.
+    async function runPersistentBlock(patch: Partial<ExtensionSettings> = {}) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.parse("2026-10-14T00:00:00.000Z");
+        let current = state;
+        const opens: number[] = [];
+        for (let minute = 0; minute <= 6 * 60; minute += 1) {
+          vi.setSystemTime(start + minute * 60 * 1000);
+          const { tick } = await decide(input(drops(), channel("creator"), { state: current, settings: settings(patch) }), {
+            openWatchTab: () => {
+              opens.push(minute);
+              throw new UnusableWatchTabError(9, blocked, { openedManagedTab: true });
+            },
+          });
+          current = tick.state;
+        }
+        return { opens, state: current };
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+
+    it("stops reopening a tab that is still rejected once the platform is flagged", async () => {
+      const { opens, state: final } = await runPersistentBlock();
+
+      expect(final.criticalHealth?.twitch).toMatchObject({ status: "flagged", breakerOpen: true });
+      expect(final.sessions.twitch).toMatchObject({ status: "idle", reasonCode: "critical_failure" });
+      expect(opens.at(-1)).toBeLessThan(2 * 60);
+    });
+
+    it("keeps retrying at the backoff cap when the critical-failure prompt is off", async () => {
+      const { opens, state: final } = await runPersistentBlock({ criticalFailurePromptEnabled: false });
+
+      expect(final.sessions.twitch.status).toBe("error");
+      expect(opens.at(-1)).toBeGreaterThan(5 * 60);
+    });
   });
 });

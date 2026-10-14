@@ -10,6 +10,7 @@ import {
   stopManagedPageContextTabsWithBrowser,
   stopWatchTabWithBrowser,
   type BrowserTabApi,
+  type PageDocumentInspector,
 } from "./browserTabs";
 
 type TabSettings = Pick<
@@ -26,23 +27,30 @@ export type PageContextRecoveryEvidence = Pick<KickPageContextRecoveryTracker, "
 // settings applied on top of the options the engine passes. It takes the
 // browser API as an argument so the controller contract suite can run it
 // against a fake browser; background.ts passes the live wxt/browser one.
-// `recoveryEvidence` holds each platform's route evidence for page-context
-// recovery; only Kick gathers any.
+// `platforms` carries what only some platforms supply: `recoveryEvidence`, the
+// route evidence for page-context recovery (only Kick gathers any), and
+// `documentInspectors`, which read whether a watch tab shows the channel page.
 export function createExtensionTabPorts(
   registry: TabRegistry,
   browserApi: BrowserTabApi,
   loadSettings: () => Promise<TabSettings>,
-  recoveryEvidence: Partial<Record<Platform, PageContextRecoveryEvidence>> = {},
+  platforms: {
+    recoveryEvidence?: Partial<Record<Platform, PageContextRecoveryEvidence>>;
+    documentInspectors?: Partial<Record<Platform, PageDocumentInspector>>;
+  } = {},
 ): BrowserTabsPort {
+  const { recoveryEvidence = {}, documentInspectors = {} } = platforms;
   return {
     watch: {
       open: async (channel, session, options, emit) => {
         const settings = await loadSettings();
+        const inspectDocument = documentInspectors[channel.platform];
         return await openPinnedMutedTabWithBrowser(registry, browserApi, channel, session, {
           muted: settings.muteFarmingTabs,
           keepVideosUnmuted: settings.keepFarmingVideosUnmuted,
           closeManagedTabs: settings.autoCloseFinishedDrops,
           ...options,
+          ...(inspectDocument ? { inspectDocument } : {}),
         }, emit);
       },
       stop: async (session, options, emit) => {
