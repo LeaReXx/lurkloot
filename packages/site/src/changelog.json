@@ -10,7 +10,8 @@
         "kind": "fixed",
         "text": "Lurkloot no longer piles up Kick tabs when Kick blocks a page with \"Request blocked by security policy\". It now waits before trying again, and if the block doesn't lift, it pauses Kick and lets you know instead of opening tab after tab. A tab that the browser refuses to close is no longer forgotten and replaced with a new one."
       }
-    ]
+    ],
+    "date": "2026-10-14"
   },
   {
     "version": "1.17.0",
