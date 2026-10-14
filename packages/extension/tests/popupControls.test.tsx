@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // Segmented and Checkbox are Base UI parts, which need real mouse events.
-import React, { act } from "react";
+import type React from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Checkbox, Segmented } from "../../popup-ui/src/controls";
@@ -25,12 +26,24 @@ function mount(node: React.ReactElement): HTMLElement {
 }
 
 describe("Segmented", () => {
-  const options = [{ value: "all", label: "All", count: 3 }, { value: "drops", label: "Drops", count: 2 }];
+  const options = [
+    { value: "all", label: "All", count: 3 },
+    { value: "drops", label: "Drops", count: 2 },
+  ];
 
   it("presses the current option and reports a new pick", () => {
     const onChange = vi.fn();
-    const container = mount(<Segmented label="Show" value="all" options={options} onChange={onChange} itemAttribute="data-facet" />);
-    const item = (value: string) => container.querySelector<HTMLButtonElement>(`[data-facet="${value}"]`)!;
+    const container = mount(
+      <Segmented
+        label="Show"
+        value="all"
+        options={options}
+        onChange={onChange}
+        itemAttribute="data-facet"
+      />,
+    );
+    const item = (value: string) =>
+      container.querySelector<HTMLButtonElement>(`[data-facet="${value}"]`)!;
 
     expect(item("all").getAttribute("aria-pressed")).toBe("true");
     expect(item("drops").getAttribute("aria-pressed")).toBe("false");
@@ -42,7 +55,15 @@ describe("Segmented", () => {
 
   it("never un-presses the only pressed option", () => {
     const onChange = vi.fn();
-    const container = mount(<Segmented label="Show" value="all" options={options} onChange={onChange} itemAttribute="data-facet" />);
+    const container = mount(
+      <Segmented
+        label="Show"
+        value="all"
+        options={options}
+        onChange={onChange}
+        itemAttribute="data-facet"
+      />,
+    );
     act(() => container.querySelector<HTMLButtonElement>('[data-facet="all"]')!.click());
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -51,7 +72,14 @@ describe("Segmented", () => {
 describe("Checkbox", () => {
   it("is a real checkbox that reports the next state", () => {
     const onChange = vi.fn();
-    const container = mount(<Checkbox checked={false} onChange={onChange} label="Farm Rust" attributes={{ "data-game-select": "" }} />);
+    const container = mount(
+      <Checkbox
+        checked={false}
+        onChange={onChange}
+        label="Farm Rust"
+        attributes={{ "data-game-select": "" }}
+      />,
+    );
     const box = container.querySelector<HTMLButtonElement>("[data-game-select]")!;
 
     expect(box.getAttribute("role")).toBe("checkbox");

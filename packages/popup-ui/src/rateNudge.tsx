@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { motion } from "motion/react";
 import { Star, X } from "lucide-react";
 import { CHROME_WEB_STORE_REVIEW_URL } from "./constants";
@@ -8,7 +8,13 @@ import { Tip } from "./tooltip";
 
 export { shouldShowGithubStarNudge, shouldShowRateNudge } from "./rateNudge.logic";
 
-export function RateNudge({ onRate, onDismiss }: { onRate(): void; onDismiss(): void }): React.ReactElement {
+export function RateNudge({
+  onRate,
+  onDismiss,
+}: {
+  onRate(): void;
+  onDismiss(): void;
+}): React.ReactElement {
   const t = useT();
   return (
     <motion.div

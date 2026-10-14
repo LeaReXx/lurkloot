@@ -1,6 +1,13 @@
 import type { ActivityEvent, PageContextOpenReason } from "@lurkloot/shared/events";
-import type { CriticalFailureReason, CriticalHealthState, FailureRecord } from "@lurkloot/shared/criticalHealth";
-import { CRITICAL_HEALTH_RECORD_LIMIT, DEFAULT_CRITICAL_HEALTH } from "@lurkloot/shared/criticalHealth";
+import type {
+  CriticalFailureReason,
+  CriticalHealthState,
+  FailureRecord,
+} from "@lurkloot/shared/criticalHealth";
+import {
+  CRITICAL_HEALTH_RECORD_LIMIT,
+  DEFAULT_CRITICAL_HEALTH,
+} from "@lurkloot/shared/criticalHealth";
 import type { Platform, SchedulerState } from "@lurkloot/shared/models";
 
 // Deliberately conservative constants, not settings. The prompt tells the user
@@ -84,7 +91,11 @@ function current(state: SchedulerState, platform: Platform): CriticalHealthState
   return state.criticalHealth?.[platform] ?? DEFAULT_CRITICAL_HEALTH;
 }
 
-function withHealth(state: SchedulerState, platform: Platform, health: CriticalHealthState): SchedulerState {
+function withHealth(
+  state: SchedulerState,
+  platform: Platform,
+  health: CriticalHealthState,
+): SchedulerState {
   return { ...state, criticalHealth: { ...state.criticalHealth, [platform]: health } };
 }
 
@@ -95,7 +106,9 @@ function appendRecord(
   record: Omit<FailureRecord, "at" | "platform"> | undefined,
 ): readonly FailureRecord[] {
   if (!record) return records;
-  return [...records, { ...record, at: new Date(at).toISOString(), platform }].slice(-CRITICAL_HEALTH_RECORD_LIMIT);
+  return [...records, { ...record, at: new Date(at).toISOString(), platform }].slice(
+    -CRITICAL_HEALTH_RECORD_LIMIT,
+  );
 }
 
 function inCooldown(health: CriticalHealthState, at: number): boolean {
@@ -107,13 +120,16 @@ function inCooldown(health: CriticalHealthState, at: number): boolean {
 // breaker open. If either the limit or that comparison changes, this must change in step
 // or the trim silently discards evidence.
 function pruneOpens(opens: readonly string[], at: number): string[] {
-  return opens.filter((stamp) => at - Date.parse(stamp) <= TAB_CHURN_WINDOW_MS).slice(-TAB_CHURN_LIMIT);
+  return opens
+    .filter((stamp) => at - Date.parse(stamp) <= TAB_CHURN_WINDOW_MS)
+    .slice(-TAB_CHURN_LIMIT);
 }
 
 // While flagged the breaker stays open until the user dismisses. While unflagged it is
 // held open only by live churn evidence, so the window drains on its own — an open
 // breaker suppresses new opens — and the platform recovers without a prompt. This never
-// opens the breaker; only crossing the threshold in recordManagedTabOpen does that.
+// opens the breaker; only crossing the threshold in recordManagedTabOpen, or
+// holdManagedTabBreaker on a flagged platform, does that.
 function releaseBreaker(health: CriticalHealthState, opens: readonly string[]): boolean {
   if (health.status === "flagged") return health.breakerOpen;
   return health.breakerOpen && opens.length > 0;
@@ -178,7 +194,8 @@ export function observeCriticalHealth(
         ? {}
         : { lastObservedAt: new Date(observation.at).toISOString() }),
     };
-    if (observation.watchedMinutes !== undefined) reset.lastWatchedMinutes = observation.watchedMinutes;
+    if (observation.watchedMinutes !== undefined)
+      reset.lastWatchedMinutes = observation.watchedMinutes;
     return { state: withHealth(state, platform, reset) };
   }
 
@@ -187,9 +204,10 @@ export function observeCriticalHealth(
   // the first failing tick counts as failing time, while a cold start under-counts by one
   // tick. Both are deliberate: charging the gap keeps a platform that fails right after a
   // clean tick honest, and under-counting a cold start only ever flags later, never sooner.
-  const delta = lastObservedAt === undefined
-    ? 0
-    : Math.min(Math.max(observation.at - lastObservedAt, 0), MAX_TICK_DELTA_MS);
+  const delta =
+    lastObservedAt === undefined
+      ? 0
+      : Math.min(Math.max(observation.at - lastObservedAt, 0), MAX_TICK_DELTA_MS);
   const next: CriticalHealthState = {
     ...health,
     failingMs: health.failingMs + delta,
@@ -199,7 +217,8 @@ export function observeCriticalHealth(
     breakerOpen,
     records,
   };
-  if (observation.watchedMinutes !== undefined) next.lastWatchedMinutes = observation.watchedMinutes;
+  if (observation.watchedMinutes !== undefined)
+    next.lastWatchedMinutes = observation.watchedMinutes;
 
   const ready = next.failingMs >= FAILING_WINDOW_MS && next.failingTicks >= MIN_FAILING_TICKS;
   if (!ready || next.status === "flagged" || inCooldown(next, observation.at)) {
@@ -238,6 +257,16 @@ export function recordManagedTabOpen(
 
   const flagged = flag(next, platform, at, "page_context_churn");
   return { state: withHealth(state, platform, flagged.health), event: flagged.event };
+}
+
+// A managed tab the platform keeps rejecting (#794) is reopened after every
+// backoff, and backoff spaces those opens too far apart for the churn window to
+// trip. Once the platform is flagged the user has been told, so the next
+// rejected open holds the breaker until they dismiss, as a churn flag would.
+export function holdManagedTabBreaker(state: SchedulerState, platform: Platform): SchedulerState {
+  const health = current(state, platform);
+  if (health.status !== "flagged" || health.breakerOpen) return state;
+  return withHealth(state, platform, { ...health, breakerOpen: true });
 }
 
 export function dismissCriticalFailure(

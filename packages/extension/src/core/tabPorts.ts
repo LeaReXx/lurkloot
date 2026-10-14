@@ -10,54 +10,94 @@ import {
   stopManagedPageContextTabsWithBrowser,
   stopWatchTabWithBrowser,
   type BrowserTabApi,
+  type PageDocumentInspector,
 } from "./browserTabs";
 
 type TabSettings = Pick<
   ExtensionSettings,
-  "muteFarmingTabs" | "keepFarmingVideosUnmuted" | "autoCloseFinishedDrops" | "adFocusMode" | "kickPageContextRecoverySuccesses"
+  | "muteFarmingTabs"
+  | "keepFarmingVideosUnmuted"
+  | "autoCloseFinishedDrops"
+  | "adFocusMode"
+  | "kickPageContextRecoverySuccesses"
 >;
 
 // The route evidence a platform's fetcher gathers between recovery cycles:
 // which hosts answered background requests and which fell back to the page.
-export type PageContextRecoveryEvidence = Pick<KickPageContextRecoveryTracker, "take" | "restore" | "discard">;
+export type PageContextRecoveryEvidence = Pick<
+  KickPageContextRecoveryTracker,
+  "take" | "restore" | "discard"
+>;
 
 // The extension's browser-tabs ports (#598): the tab mechanics in ./browserTabs,
 // bound to one tab registry and one browser tab API, with the user's tab
 // settings applied on top of the options the engine passes. It takes the
 // browser API as an argument so the controller contract suite can run it
 // against a fake browser; background.ts passes the live wxt/browser one.
-// `recoveryEvidence` holds each platform's route evidence for page-context
-// recovery; only Kick gathers any.
+// `platforms` carries what only some platforms supply: `recoveryEvidence`, the
+// route evidence for page-context recovery (only Kick gathers any), and
+// `documentInspectors`, which read whether a watch tab shows the channel page.
 export function createExtensionTabPorts(
   registry: TabRegistry,
   browserApi: BrowserTabApi,
   loadSettings: () => Promise<TabSettings>,
-  recoveryEvidence: Partial<Record<Platform, PageContextRecoveryEvidence>> = {},
+  platforms: {
+    recoveryEvidence?: Partial<Record<Platform, PageContextRecoveryEvidence>>;
+    documentInspectors?: Partial<Record<Platform, PageDocumentInspector>>;
+  } = {},
 ): BrowserTabsPort {
+  const { recoveryEvidence = {}, documentInspectors = {} } = platforms;
   return {
     watch: {
       open: async (channel, session, options, emit) => {
         const settings = await loadSettings();
-        return await openPinnedMutedTabWithBrowser(registry, browserApi, channel, session, {
-          muted: settings.muteFarmingTabs,
-          keepVideosUnmuted: settings.keepFarmingVideosUnmuted,
-          closeManagedTabs: settings.autoCloseFinishedDrops,
-          ...options,
-        }, emit);
+        const inspectDocument = documentInspectors[channel.platform];
+        return await openPinnedMutedTabWithBrowser(
+          registry,
+          browserApi,
+          channel,
+          session,
+          {
+            muted: settings.muteFarmingTabs,
+            keepVideosUnmuted: settings.keepFarmingVideosUnmuted,
+            closeManagedTabs: settings.autoCloseFinishedDrops,
+            ...options,
+            ...(inspectDocument ? { inspectDocument } : {}),
+          },
+          emit,
+        );
       },
       stop: async (session, options, emit) => {
         const settings = await loadSettings();
-        await stopWatchTabWithBrowser(registry, browserApi, session, { closeManagedTabs: settings.autoCloseFinishedDrops, ...options }, emit);
+        await stopWatchTabWithBrowser(
+          registry,
+          browserApi,
+          session,
+          { closeManagedTabs: settings.autoCloseFinishedDrops, ...options },
+          emit,
+        );
       },
-      closeManaged: (tabs, origin) => closeManagedWatchTabsWithBrowser(registry, browserApi, tabs, origin),
+      closeManaged: (tabs, origin) =>
+        closeManagedWatchTabsWithBrowser(registry, browserApi, tabs, origin),
       applyAdFocus: async (platform, tabId, adActive, emit) => {
         const { adFocusMode } = await loadSettings();
-        await applyAdFocusWithBrowser(registry, browserApi, platform, tabId, adActive, adFocusMode, emit);
+        await applyAdFocusWithBrowser(
+          registry,
+          browserApi,
+          platform,
+          tabId,
+          adActive,
+          adFocusMode,
+          emit,
+        );
       },
-      loadPlaybackPolicy: async () => ({ keepVideosUnmuted: (await loadSettings()).keepFarmingVideosUnmuted !== false }),
+      loadPlaybackPolicy: async () => ({
+        keepVideosUnmuted: (await loadSettings()).keepFarmingVideosUnmuted !== false,
+      }),
     },
     pageContexts: {
-      release: (contexts, options) => stopManagedPageContextTabsWithBrowser(registry, browserApi, contexts, options),
+      release: (contexts, options) =>
+        stopManagedPageContextTabsWithBrowser(registry, browserApi, contexts, options),
       recover: async (platform, options, emit) => {
         const evidence = recoveryEvidence[platform];
         const observation = evidence?.take();

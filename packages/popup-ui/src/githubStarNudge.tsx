@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { GITHUB_REPO_URL } from "./constants";
@@ -6,7 +6,13 @@ import { useT } from "./context";
 import { cn } from "./primitives";
 import { Tip } from "./tooltip";
 
-export function GithubStarNudge({ onStar, onDismiss }: { onStar(): void; onDismiss(): void }): React.ReactElement {
+export function GithubStarNudge({
+  onStar,
+  onDismiss,
+}: {
+  onStar(): void;
+  onDismiss(): void;
+}): React.ReactElement {
   const t = useT();
   return (
     <motion.div
