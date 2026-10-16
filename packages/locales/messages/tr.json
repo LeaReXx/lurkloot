@@ -443,11 +443,23 @@
   "endsIn": {
     "message": "$1 sonra bitiyor"
   },
+  "watchToGo": {
+    "message": "$1 izlenecek"
+  },
   "left": {
     "message": "kaldı"
   },
-  "campaignLeft": {
-    "message": "Kampanyada kalan"
+  "campaignFactWatchTime": {
+    "message": "İzleme süresi"
+  },
+  "watchTimeLeftValue": {
+    "message": "$1 kaldı"
+  },
+  "watchTimeNeeded": {
+    "message": "$1 gerekli"
+  },
+  "watchTimeOfTotal": {
+    "message": "toplam $1"
   },
   "done": {
     "message": "Bitti"
@@ -1748,8 +1760,20 @@
   "campaignFactStarts": {
     "message": "Başlangıç"
   },
+  "campaignFactStarted": {
+    "message": "Başladı"
+  },
   "campaignFactEnds": {
     "message": "Bitiş"
+  },
+  "relativeIn": {
+    "message": "$1 içinde"
+  },
+  "relativeAgo": {
+    "message": "$1 önce"
+  },
+  "campaignLasts": {
+    "message": "$1 sürer"
   },
   "campaignFactEnded": {
     "message": "Bitti"
