@@ -443,11 +443,23 @@
   "endsIn": {
     "message": "Закончится через $1"
   },
+  "watchToGo": {
+    "message": "ещё $1 просмотра"
+  },
   "left": {
     "message": "Осталось"
   },
-  "campaignLeft": {
-    "message": "Осталось в кампании"
+  "campaignFactWatchTime": {
+    "message": "Время просмотра"
+  },
+  "watchTimeLeftValue": {
+    "message": "Осталось $1"
+  },
+  "watchTimeNeeded": {
+    "message": "Нужно $1"
+  },
+  "watchTimeOfTotal": {
+    "message": "из $1 всего"
   },
   "done": {
     "message": "Готово"
@@ -1748,8 +1760,20 @@
   "campaignFactStarts": {
     "message": "Начало"
   },
+  "campaignFactStarted": {
+    "message": "Началась"
+  },
   "campaignFactEnds": {
     "message": "Конец"
+  },
+  "relativeIn": {
+    "message": "через $1"
+  },
+  "relativeAgo": {
+    "message": "$1 назад"
+  },
+  "campaignLasts": {
+    "message": "Длится $1"
   },
   "campaignFactEnded": {
     "message": "Завершена"
