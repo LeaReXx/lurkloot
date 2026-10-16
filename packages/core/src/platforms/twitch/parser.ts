@@ -243,9 +243,9 @@ function parseTwitchCampaignSource(source: TwitchCampaignSource): DropCampaign[]
     const slug = campaign.game?.slug;
     const startsAt = campaign.startAt;
     const endsAt = campaign.endAt;
-    const accountLinkUrl = normalizeTwitchAccountLinkUrl(campaign.accountLinkURL);
-    const hasAccountLink = Boolean(accountLinkUrl);
-    const accountLinked = !hasAccountLink || campaign.self?.isAccountConnected !== false;
+    const accountLinkUrl = campaign.accountLinkURL?.trim() || undefined;
+    const accountLinked =
+      campaign.self?.isAccountConnected !== false || !requiresTwitchAccountLink(campaign);
     const rawStatus = campaign.status?.toLowerCase();
     const status =
       startsAt && Date.parse(startsAt) > now
@@ -335,16 +335,16 @@ function parseTwitchCampaignSource(source: TwitchCampaignSource): DropCampaign[]
   });
 }
 
-function normalizeTwitchAccountLinkUrl(value: string | null | undefined): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  try {
-    const hostname = new URL(trimmed).hostname.toLowerCase().replace(/^www\./, "");
-    if (hostname === "twitch.tv" || hostname.endsWith(".twitch.tv")) return undefined;
-  } catch {
-    // Preserve non-URL values for compatibility; Twitch normally returns an absolute URL.
-  }
-  return trimmed;
+// Twitch's drops page asks for a link only when a campaign rewards something
+// other than its own badges or emotes; isAccountConnected is false on those too
+// (EWC 2026, #94). The link URL plays no part: Kakele links through Twitch's
+// own OAuth page (#828).
+function requiresTwitchAccountLink(campaign: TwitchCampaign): boolean {
+  const types = (campaign.timeBasedDrops ?? []).flatMap((drop) =>
+    (drop.benefitEdges ?? []).map((edge) => edge.benefit?.distributionType),
+  );
+  if (types.length === 0) return true;
+  return !(types.every((type) => type === "BADGE") || types.every((type) => type === "EMOTE"));
 }
 
 // The shape of Twitch's own dropInstanceID, so a watch reward's key and its
@@ -558,14 +558,13 @@ export function mergeTwitchCampaignProgress(
       : progress?.status === "completed"
         ? campaign.status
         : (progress?.status ?? campaign.status);
-    const inventoryConnected = rawInventoryCampaigns.find((item) => item.id === campaign.id)?.self
-      ?.isAccountConnected;
+    const rawProgress = rawInventoryCampaigns.find((item) => item.id === campaign.id);
+    const inventoryConnected = rawProgress?.self?.isAccountConnected;
     // Inventory is fetched every refresh, whereas details may be cached. Only
-    // an explicit connection field may override details: a URL-less inventory
-    // record parses as linked even when its connection state is absent.
+    // an explicit connection field may override details.
     const accountLinked =
-      typeof inventoryConnected === "boolean"
-        ? !campaign.accountLinkUrl || inventoryConnected
+      rawProgress && typeof inventoryConnected === "boolean"
+        ? inventoryConnected || !requiresTwitchAccountLink(rawProgress)
         : campaign.accountLinked;
     return withCampaignStatus({ ...campaign, accountLinked, rewards }, status);
   });
