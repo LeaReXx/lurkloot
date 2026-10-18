@@ -42,7 +42,8 @@
         "kind": "fixed",
         "text": "Lurkloot no longer tries to claim Kick rewards every minute when the campaign needs a linked Kick account. It waits before trying again and warns once, instead of filling the activity log with failed claims."
       }
-    ]
+    ],
+    "date": "2026-10-18"
   },
   {
     "version": "1.17.2",
