@@ -1,17 +1,23 @@
 // @vitest-environment happy-dom
 // The card's Exclude menu is a Base UI menu, which needs real mouse and
 // keyboard events; linkedom has none.
-import type React from "react";
+import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DropCampaign, ExtensionSettings, WatchSession } from "@lurkloot/shared/models";
+import type {
+  DropCampaign,
+  ExtensionSettings,
+  RewardFilter,
+  WatchSession,
+} from "@lurkloot/shared/models";
+import { defaultRewardFilter } from "@lurkloot/shared/rewardFilter";
 import { mergeSettings } from "@lurkloot/shared/settings";
 import { rankCampaigns } from "@lurkloot/shared/ranking";
 import { I18nContext } from "../../popup-ui/src/context";
 import { QueuePanel } from "../../popup-ui/src/queue";
 import { CompletedPanel } from "../../popup-ui/src/completed";
-import { campaignViewFromCampaign } from "../../popup-ui/src/viewModels";
+import { campaignViewFromCampaign, showsSubscriptionChoice } from "../../popup-ui/src/viewModels";
 import type { CampaignView, TFunction } from "../../popup-ui/src/types";
 
 const t: TFunction = (key, substitutions) => {
@@ -100,7 +106,11 @@ function queue(
       refreshing={false}
       strategy={settings.priorityMode}
       pinnedCount={settings.campaignPins.length}
-      farmPinnedOnly={settings.farmPinnedOnly}
+      farmPinnedOnly={settings.platform.twitch.farmPinnedOnly}
+      platform="twitch"
+      rewardFilter={settings.platform.twitch.rewardFilter}
+      showSubscriptionChoice
+      onRewardFilterChange={() => undefined}
       onStrategyChange={() => undefined}
       onUnpinAll={() => undefined}
       onFarmPinnedOnlyChange={() => undefined}
@@ -221,44 +231,9 @@ describe("queue view", () => {
     expect(rows(container, "strategy")).toEqual(["now"]);
   });
 
-  it("picks any number of reward types to farm from its tabs", () => {
-    const settings = mergeSettings({});
-    const onRewardTypesChange = vi.fn();
-    const { container } = queue(views([campaign("drop")], settings), settings, {
-      rewardTypes: ["badge"],
-      rewardTypeCounts: { all: 1, no_subscription: 1, subscription: 0, badge: 0 },
-      onRewardTypesChange,
-    });
-
-    const tab = (value: string) =>
-      container.querySelector<HTMLButtonElement>(`[data-queue-facet="${value}"]`)!;
-    expect(
-      tab("badge").getAttribute("aria-checked") ?? tab("badge").getAttribute("aria-pressed"),
-    ).toBe("true");
-    expect(tab("all").textContent).toContain("1");
-    act(() => tab("subscription").click());
-
-    // Pressing another type adds it; "All" clears the selection.
-    expect(onRewardTypesChange).toHaveBeenLastCalledWith(["subscription", "badge"]);
-    act(() => tab("all").click());
-    expect(onRewardTypesChange).toHaveBeenLastCalledWith([]);
-    act(() => tab("badge").click());
-    expect(onRewardTypesChange).toHaveBeenLastCalledWith([]);
-  });
-
-  it("offers only the tabs the platform can farm", () => {
-    const settings = mergeSettings({});
-    const { container } = queue(views([campaign("drop")], settings), settings, {
-      availableRewardTypes: ["no_subscription", "subscription"],
-    });
-
-    expect(container.querySelector('[data-queue-facet="subscription"]')).not.toBeNull();
-    expect(container.querySelector('[data-queue-facet="badge"]')).toBeNull();
-  });
-
-  it("skips a campaign with no reward of the types, with a fix that farms every type", () => {
+  it("skips a campaign with no reward the filter allows, with a fix that farms every reward", () => {
     const settings = mergeSettings({
-      platform: { twitch: { farmRewardTypes: ["badge"] } },
+      platform: { twitch: { rewardFilter: { kinds: ["badge"], subscriptions: "include" } } },
     } as never);
     const badge = campaign("badge", {
       rewards: [
@@ -274,10 +249,9 @@ describe("queue view", () => {
         },
       ],
     });
-    const onRewardTypesChange = vi.fn();
+    const onRewardFilterChange = vi.fn();
     const { container } = queue(views([campaign("drop"), badge], settings), settings, {
-      rewardTypes: ["badge"],
-      onRewardTypesChange,
+      onRewardFilterChange,
     });
 
     expect(rows(container, "strategy")).toEqual(["badge"]);
@@ -288,7 +262,275 @@ describe("queue view", () => {
     ].find((button) => button.textContent === "queueFixFarmAll");
     expect(fix).toBeDefined();
     act(() => fix!.click());
-    expect(onRewardTypesChange).toHaveBeenCalledWith([]);
+    expect(onRewardFilterChange).toHaveBeenCalledWith(defaultRewardFilter("twitch"));
+  });
+
+  const subBadge = (id: string, platform: "twitch" | "kick" = "twitch") =>
+    campaign(id, {
+      platform,
+      rewards: [
+        {
+          id: `${id}-reward`,
+          name: "Sub badge",
+          benefits: [{ id: "b", distributionType: "BADGE" }],
+          requiredSubs: 1,
+          requiredMinutes: 0,
+          requirement: "subscription",
+          isWatchBased: false,
+          watchedMinutes: 0,
+          status: "locked",
+        },
+      ],
+    } as Partial<DropCampaign>);
+  const badgeOnly = (id: string) =>
+    campaign(id, {
+      rewards: [
+        {
+          id: `${id}-reward`,
+          name: "Badge",
+          benefits: [{ id: "b", distributionType: "BADGE" }],
+          requiredMinutes: 30,
+          requirement: "watch",
+          isWatchBased: true,
+          watchedMinutes: 0,
+          status: "locked",
+        },
+      ],
+    });
+  const farmAllOffered = (container: Element, id: string) =>
+    [...container.querySelectorAll<HTMLButtonElement>(`[data-campaign-id="${id}"] button`)].some(
+      (button) => button.textContent === "queueFixFarmAll",
+    );
+
+  it("says which part of the reward filter skipped a campaign", () => {
+    const settings = mergeSettings({
+      platform: { twitch: { rewardFilter: { kinds: ["badge"], subscriptions: "skip" } } },
+    } as never);
+    const { container } = queue(
+      views([campaign("item-only"), subBadge("sub-badge")], settings),
+      settings,
+    );
+
+    expand(container, "skipped");
+    const reason = (id: string) => openCard(container, id).textContent ?? "";
+    expect(reason("item-only")).toContain("campaignRejectionRewardKind:rewardKindBadge");
+    expect(reason("sub-badge")).toContain("campaignRejectionSubscriptionSkipped");
+    expect(farmAllOffered(container, "item-only")).toBe(true);
+    expect(farmAllOffered(container, "sub-badge")).toBe(true);
+  });
+
+  it("explains a Kick campaign skipped by a leftover only", () => {
+    const settings = mergeSettings({
+      platform: { kick: { rewardFilter: { kinds: ["item"], subscriptions: "only" } } },
+    } as never);
+    const { container } = queue(views([campaign("k", { platform: "kick" })], settings), settings, {
+      platform: "kick",
+      rewardFilter: settings.platform.kick.rewardFilter,
+    });
+
+    expand(container, "skipped");
+    expect(openCard(container, "k").textContent).toContain("campaignRejectionSubscriptionOnly");
+  });
+
+  it("counts the campaigns the reward filter skipped on the Skipped divider", () => {
+    const settings = mergeSettings({
+      excludedCampaignIds: ["hidden"],
+      platform: { twitch: { rewardFilter: { kinds: ["badge"], subscriptions: "include" } } },
+    } as never);
+    const { container } = queue(
+      views([badgeOnly("keep"), campaign("a"), campaign("b"), campaign("hidden")], settings),
+      settings,
+    );
+    const hint = (c: Element) =>
+      c.querySelector('[data-queue-disclosure="skipped"] span:nth-of-type(2)')?.textContent;
+    expect(hint(container)).toBe("queueSkippedByFilter:2");
+
+    const plain = mergeSettings({ excludedCampaignIds: ["hidden"] } as never);
+    act(() => root?.unmount());
+    root = undefined;
+    const unfiltered = queue(views([campaign("hidden")], plain), plain);
+    expect(
+      unfiltered.container.querySelector('[data-queue-disclosure="skipped"]')?.textContent,
+    ).not.toContain("queueSkippedByFilter");
+  });
+
+  // The menu is portalled out of the panel, so its parts are looked up on the
+  // document.
+  const settle = (action: () => void) =>
+    act(async () => {
+      action();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  const openFilter = (container: Element) =>
+    settle(() => container.querySelector<HTMLButtonElement>("[data-reward-filter]")!.click());
+
+  // Holds the filter the way the popup does: each change is saved and comes
+  // back as the new prop.
+  function FilterHarness({
+    sources,
+    initial,
+    onRewardFilterChange,
+  }: {
+    sources: DropCampaign[];
+    initial: RewardFilter;
+    onRewardFilterChange(filter: RewardFilter): void;
+  }): React.ReactElement {
+    const [filter, setFilter] = React.useState(initial);
+    const settings = mergeSettings({ platform: { twitch: { rewardFilter: filter } } } as never);
+    return (
+      <QueuePanel
+        campaigns={views(sources, settings)}
+        gameMap={{}}
+        refreshing={false}
+        strategy={settings.priorityMode}
+        pinnedCount={0}
+        farmPinnedOnly={false}
+        platform="twitch"
+        rewardFilter={filter}
+        showSubscriptionChoice={showsSubscriptionChoice(sources, filter)}
+        onRewardFilterChange={(next) => {
+          onRewardFilterChange(next);
+          setFilter(next);
+        }}
+        onStrategyChange={() => undefined}
+        onUnpinAll={() => undefined}
+        onFarmPinnedOnlyChange={() => undefined}
+        onRefreshCampaign={() => undefined}
+        onPinChange={() => undefined}
+        onToggleExclude={() => undefined}
+        onOpenGames={() => undefined}
+        onOpenSettings={() => undefined}
+      />
+    );
+  }
+
+  it("opens the reward filter from the toolbar and saves both questions", async () => {
+    const subscription = campaign("sub", {
+      rewards: [
+        {
+          id: "sub-reward",
+          name: "Sub reward",
+          requiredSubs: 1,
+          requiredMinutes: 0,
+          requirement: "subscription",
+          isWatchBased: false,
+          watchedMinutes: 0,
+          status: "locked",
+        },
+      ],
+    } as Partial<DropCampaign>);
+    const onRewardFilterChange = vi.fn();
+    const { container } = mount(
+      <FilterHarness
+        sources={[campaign("drop"), subscription]}
+        initial={defaultRewardFilter("twitch")}
+        onRewardFilterChange={onRewardFilterChange}
+      />,
+    );
+
+    const trigger = container.querySelector<HTMLButtonElement>("[data-reward-filter]")!;
+    expect(trigger.textContent).toContain("rewardFilterAll");
+    expect(trigger.getAttribute("aria-label")).toBe("rewardFilterTitle: rewardFilterAll");
+    expect(trigger.hasAttribute("data-narrowed")).toBe(false);
+    await openFilter(container);
+
+    await settle(() => document.querySelector<HTMLElement>('[data-reward-kind="item"]')!.click());
+    expect(onRewardFilterChange).toHaveBeenLastCalledWith({
+      kinds: ["badge", "emote"],
+      subscriptions: "include",
+    });
+
+    await settle(() =>
+      document.querySelector<HTMLElement>('[data-subscription-option="skip"]')!.click(),
+    );
+    expect(onRewardFilterChange).toHaveBeenLastCalledWith({
+      kinds: ["badge", "emote"],
+      subscriptions: "skip",
+    });
+    expect(trigger.hasAttribute("data-narrowed")).toBe(true);
+    expect(trigger.textContent).toContain("rewardFilterNoSub");
+
+    // Reset appears once narrowed, and restores every reward.
+    await settle(() => document.querySelector<HTMLElement>("[data-reward-filter-reset]")!.click());
+    expect(onRewardFilterChange).toHaveBeenLastCalledWith(defaultRewardFilter("twitch"));
+  });
+
+  it("closes the reward filter on Escape", async () => {
+    const { container } = mount(
+      <FilterHarness
+        sources={[campaign("drop")]}
+        initial={defaultRewardFilter("twitch")}
+        onRewardFilterChange={() => undefined}
+      />,
+    );
+    const trigger = container.querySelector<HTMLButtonElement>("[data-reward-filter]")!;
+    await openFilter(container);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+    await settle(() =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      ),
+    );
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("shows the subscription choice on a platform without subscription rewards only while it is narrowed", async () => {
+    const kick = [campaign("k", { platform: "kick" })];
+    const kickQueue = (filter: RewardFilter) => {
+      const settings = mergeSettings({ platform: { kick: { rewardFilter: filter } } } as never);
+      return queue(views(kick, settings), settings, {
+        platform: "kick",
+        rewardFilter: filter,
+        showSubscriptionChoice: showsSubscriptionChoice(kick, filter),
+      });
+    };
+
+    const plain = kickQueue({ kinds: ["item"], subscriptions: "include" });
+    await openFilter(plain.container);
+    expect(document.querySelector("[data-reward-kind]")).toBeNull();
+    expect(document.querySelector("[data-subscription-mode]")).toBeNull();
+    act(() => root?.unmount());
+    root = undefined;
+
+    const narrowed = kickQueue({ kinds: ["item"], subscriptions: "only" });
+    await openFilter(narrowed.container);
+    expect(document.querySelectorAll("[data-subscription-mode]")).toHaveLength(1);
+  });
+
+  it("moves farm pinned only into the menu", async () => {
+    const settings = mergeSettings(undefined);
+    const onFarmPinnedOnlyChange = vi.fn();
+    const { container } = queue(views([campaign("drop")], settings), settings, {
+      onFarmPinnedOnlyChange,
+    });
+
+    expect(container.querySelector("[data-queue-pinned-only]")).toBeNull();
+    await openFilter(container);
+    const pinnedOnly = document.querySelector<HTMLElement>("[data-queue-pinned-only]");
+    expect(pinnedOnly).not.toBeNull();
+    expect(container.contains(pinnedOnly)).toBe(false);
+    await settle(() => pinnedOnly!.click());
+    expect(onFarmPinnedOnlyChange).toHaveBeenCalledWith(true);
+  });
+
+  it("opens the platform's reward settings from an unlinked campaign's fix", () => {
+    const settings = mergeSettings({
+      platform: { twitch: { farmUnlinkedCampaigns: false } },
+    } as never);
+    const unlinked = campaign("unlinked", { accountLinked: false } as Partial<DropCampaign>);
+    const onOpenSettings = vi.fn();
+    const { container } = queue(views([campaign("drop"), unlinked], settings), settings, {
+      onOpenSettings,
+    });
+
+    expand(container, "skipped");
+    const fix = container.querySelector<HTMLButtonElement>(
+      '[data-campaign-id="unlinked"] [data-queue-fix]',
+    );
+    expect(fix?.textContent).toBe("queueFixSettings");
+    act(() => fix!.click());
+    expect(onOpenSettings).toHaveBeenCalledWith("twitch.rewards");
   });
 
   it("lists a campaign only an outside action can unblock under Action required, apart from Skipped (#677)", () => {
@@ -526,11 +768,10 @@ describe("campaign card actions", () => {
     expect(row("ordinary").getAttribute("data-campaign-rank")).toBe("2");
   });
 
-  it("places a searched pin by its real rank while the reward types skip other pins", () => {
+  it("places a searched pin by its real rank while the reward filter skips other pins", () => {
     const settings = mergeSettings({
       campaignPins: ["badge", "d1", "d2"],
-      platform: { twitch: { farmRewardTypes: ["no_subscription"] } },
-      farmingEligibility: { farmSubscriptionCampaigns: true },
+      platform: { twitch: { rewardFilter: { kinds: ["item"], subscriptions: "skip" } } },
     } as never);
     const badge = campaign("badge", {
       rewards: [
@@ -582,7 +823,10 @@ describe("campaign card actions", () => {
   it("keeps a skipped campaign's fix when search finds it", () => {
     // With "farm pinned only" on, an unpinned campaign is skipped and its fix
     // is pinning it; search used to show it with no way to do that.
-    const settings = mergeSettings({ campaignPins: ["pinned"], farmPinnedOnly: true } as never);
+    const settings = mergeSettings({
+      campaignPins: ["pinned"],
+      platform: { twitch: { farmPinnedOnly: true } },
+    } as never);
     const { container } = queue(views([campaign("pinned"), campaign("loose")], settings), settings);
 
     search(container, "loose");

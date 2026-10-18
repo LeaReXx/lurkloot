@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Ignoradas"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 fora do seu filtro de recompensas"
+  },
   "queueActionRequired": {
     "message": "Ação necessária"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Depois por"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farmar só as fixadas"
-  },
   "queueUnpinAll": {
     "message": "Desafixar todas ($1)"
   },
   "queueUnpin": {
     "message": "Desafixar"
-  },
-  "queueFacetLabel": {
-    "message": "Recompensas para farmar"
-  },
-  "queueFacetAll": {
-    "message": "Todas"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Sem inscrição"
-  },
-  "queueFacetSubscription": {
-    "message": "Requer inscrição"
-  },
-  "queueFacetBadge": {
-    "message": "Emblemas"
   },
   "queueFixInclude": {
     "message": "Incluir"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Esta campanha da Twitch exige uma conta vinculada."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "O farm de campanhas de inscrição está desativado."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Esta campanha não corresponde às categorias selecionadas."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "No momento, apenas campanhas fixadas são farmadas."
   },
-  "campaignRejectionRewardType": {
-    "message": "Nenhuma das recompensas dela é dos tipos que você farma."
+  "campaignRejectionRewardKind": {
+    "message": "Nada aqui corresponde aos seus tipos de recompensa ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "As recompensas exigem uma assinatura, e você está pulando essas."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Não tem recompensas de assinatura, e você está farmando só essas."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "As recompensas dela dos tipos que você farma já foram obtidas."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Quando desativado, campanhas que exigem vincular sua conta são ignoradas. A plataforma ainda pode exigir vinculação quando ativado."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farmar campanhas que exigem inscrição"
+  "rewardFilterTitle": {
+    "message": "Recompensas para farmar"
   },
-  "farmSubscriptionDescription": {
-    "message": "Quando desativado, campanhas cujas recompensas exigem uma inscrição no canal são ignoradas."
+  "rewardFilterDescription": {
+    "message": "O que o Lurkloot farma em $1. O menu de filtro na Fila altera a mesma configuração."
+  },
+  "rewardKindsTitle": {
+    "message": "Tipos de recompensa"
+  },
+  "rewardKindsDescription": {
+    "message": "Uma recompensa é farmada se qualquer parte dela corresponder."
+  },
+  "rewardKindItem": {
+    "message": "Itens no jogo"
+  },
+  "rewardKindBadge": {
+    "message": "Emblemas"
+  },
+  "rewardKindEmote": {
+    "message": "Emotes"
+  },
+  "rewardKindItemShort": {
+    "message": "Itens"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Recompensas de assinatura"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Recompensas que exigem uma assinatura do canal."
+  },
+  "subscriptionModeInclude": {
+    "message": "Incluir"
+  },
+  "subscriptionModeSkip": {
+    "message": "Pular"
+  },
+  "subscriptionModeOnly": {
+    "message": "Só"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Recompensas de assinatura são farmadas junto com as demais."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Recompensas que exigem assinatura não são farmadas."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Só as recompensas que exigem assinatura são farmadas."
+  },
+  "rewardFilterAll": {
+    "message": "Todas as recompensas"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Todos"
+  },
+  "rewardFilterNoSub": {
+    "message": "sem assinatura"
+  },
+  "rewardFilterSubOnly": {
+    "message": "só assinatura"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "só fixadas"
+  },
+  "rewardFilterReset": {
+    "message": "Redefinir para todas as recompensas"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farmar só campanhas fixadas"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Só as campanhas que você fixou na Fila são farmadas em $1."
   },
   "forgetExcludedTitle": {
     "message": "Esquecer campanhas excluídas"

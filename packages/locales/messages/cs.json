@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Přeskočené"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 mimo váš filtr odměn"
+  },
   "queueActionRequired": {
     "message": "Vyžaduje akci"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Poté podle"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farmit jen připnuté"
-  },
   "queueUnpinAll": {
     "message": "Odepnout vše ($1)"
   },
   "queueUnpin": {
     "message": "Odepnout"
-  },
-  "queueFacetLabel": {
-    "message": "Typ kampaně"
-  },
-  "queueFacetAll": {
-    "message": "Vše"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Bez předplatného"
-  },
-  "queueFacetSubscription": {
-    "message": "Vyžaduje předplatné"
-  },
-  "queueFacetBadge": {
-    "message": "Odznaky"
   },
   "queueFixInclude": {
     "message": "Zahrnout"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Pro tuto kampaň Twitch je vyžadováno propojení účtu."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Farmení kampaní s předplatným je vypnuté."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Tato kampaň neodpovídá vybraným kategoriím."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Teď se farmí jen připnuté kampaně."
   },
-  "campaignRejectionRewardType": {
-    "message": "Žádná z jejích odměn není typu, který farmíte."
+  "campaignRejectionRewardKind": {
+    "message": "Nic tu neodpovídá vašim typům odměn ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Jejich odměny vyžadují předplatné a ty přeskakujete."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Nemá odměny za předplatné a farmí se jen ty."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Odměny typů, které farmíte, už jsou získané."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Když vypnuto, přeskočí kampaně vyžadující propojení účtu. Požadavky platformy mohou propojení vyžadovat i při zapnutí."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farmit kampaně vyžadující předplatné"
+  "rewardFilterTitle": {
+    "message": "Odměny k farmení"
   },
-  "farmSubscriptionDescription": {
-    "message": "Když vypnuto, přeskočí kampaně, jejichž odměny vyžadují předplatné kanálu."
+  "rewardFilterDescription": {
+    "message": "Co Lurkloot farmí na $1. Filtr ve Frontě mění stejné nastavení."
+  },
+  "rewardKindsTitle": {
+    "message": "Typy odměn"
+  },
+  "rewardKindsDescription": {
+    "message": "Odměna se farmí, pokud odpovídá alespoň její část."
+  },
+  "rewardKindItem": {
+    "message": "Předměty ve hře"
+  },
+  "rewardKindBadge": {
+    "message": "Odznaky"
+  },
+  "rewardKindEmote": {
+    "message": "Emotikony"
+  },
+  "rewardKindItemShort": {
+    "message": "Předměty"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Odměny za předplatné"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Odměny, které vyžadují předplatné kanálu."
+  },
+  "subscriptionModeInclude": {
+    "message": "Zahrnout"
+  },
+  "subscriptionModeSkip": {
+    "message": "Přeskočit"
+  },
+  "subscriptionModeOnly": {
+    "message": "Pouze"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Odměny za předplatné se farmí spolu s ostatními."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Odměny vyžadující předplatné se nefarmí."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Farmí se jen odměny vyžadující předplatné."
+  },
+  "rewardFilterAll": {
+    "message": "Všechny odměny"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Vše"
+  },
+  "rewardFilterNoSub": {
+    "message": "bez subu"
+  },
+  "rewardFilterSubOnly": {
+    "message": "jen sub"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "jen připnuté"
+  },
+  "rewardFilterReset": {
+    "message": "Obnovit všechny odměny"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farmit jen připnuté kampaně"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Na $1 se farmí jen kampaně připnuté ve Frontě."
   },
   "forgetExcludedTitle": {
     "message": "Zapomenout vyloučené kampaně"

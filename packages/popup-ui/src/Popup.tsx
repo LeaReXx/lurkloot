@@ -13,15 +13,14 @@ import type { ActivityHistoryRecord } from "@lurkloot/shared/events";
 import type {
   CategorySelection,
   ExtensionSettings,
-  RewardFarmType,
   Platform,
+  RewardKind,
   TwitchExtensionProviderId,
   WatchSourceId,
 } from "@lurkloot/shared/models";
 import {
   applySettingsPatch,
   DEFAULT_SETTINGS,
-  REWARD_FARM_TYPES,
   mergeSettings,
   type SettingsPatch,
 } from "@lurkloot/shared/settings";
@@ -57,8 +56,8 @@ import type {
 import { variantShowsPopup } from "./types";
 import {
   campaignViewFromCampaign,
-  farmRewardTypeCounts,
-  type RewardTypeTab,
+  rewardKindCounts as countRewardKinds,
+  showsSubscriptionChoice,
   reuseIfUnchanged,
   reuseUnchangedViews,
   channelViewFromSession,
@@ -857,7 +856,8 @@ export function Popup({
     inputs?: readonly unknown[];
     campaigns?: CampaignView[];
     gameMap?: Record<string, GameItem>;
-    rewardTypeCounts?: Record<RewardTypeTab, number>;
+    rewardKindCounts?: Record<RewardKind, number>;
+    subscriptionChoice?: Record<Platform, boolean>;
   }>({});
 
   // The mark toggle every campaign card reads from context. Its identity never
@@ -968,13 +968,31 @@ export function Popup({
     derived.current.gameMap,
     Object.fromEntries(games.map((game) => [game.id, game])),
   );
-  const rewardTypeCounts = inputsChanged
+  const rewardKindCounts = inputsChanged
     ? reuseIfUnchanged(
-        derived.current.rewardTypeCounts,
-        farmRewardTypeCounts(snapshot.state.campaigns[platform], settings),
+        derived.current.rewardKindCounts,
+        countRewardKinds(snapshot.state.campaigns[platform], settings, platform),
       )
-    : derived.current.rewardTypeCounts!;
-  derived.current = { inputs: derivationInputs, campaigns, gameMap, rewardTypeCounts };
+    : derived.current.rewardKindCounts!;
+  // Per platform, whether the reward filter asks about subscription rewards.
+  // Kept by value: Settings rebuilds its registry whenever this changes identity.
+  const subscriptionChoice = reuseIfUnchanged(derived.current.subscriptionChoice, {
+    twitch: showsSubscriptionChoice(
+      snapshot.state.campaigns.twitch,
+      settings.platform.twitch.rewardFilter,
+    ),
+    kick: showsSubscriptionChoice(
+      snapshot.state.campaigns.kick,
+      settings.platform.kick.rewardFilter,
+    ),
+  });
+  derived.current = {
+    inputs: derivationInputs,
+    campaigns,
+    gameMap,
+    rewardKindCounts,
+    subscriptionChoice,
+  };
   const idleWatchlistChannels = settings.platform[platform].idleWatchlistChannels;
   const idleWatchlist = idleWatchlistChannels.map((username) =>
     streamerItemFromFallback(username, session, t),
@@ -1252,6 +1270,7 @@ export function Popup({
                                 ? "general.drops"
                                 : settingsFocus
                             }
+                            showSubscriptionChoice={subscriptionChoice}
                           />
                         ) : view === "activity" ? (
                           <ActivityLog
@@ -1424,17 +1443,14 @@ export function Popup({
                               refreshing={refreshing}
                               strategy={settings.priorityMode}
                               pinnedCount={settings.campaignPins.length}
-                              farmPinnedOnly={settings.farmPinnedOnly}
-                              rewardTypes={settings.platform[platform].farmRewardTypes}
-                              availableRewardTypes={
-                                platform === "twitch"
-                                  ? REWARD_FARM_TYPES
-                                  : REWARD_FARM_TYPES.filter((type) => type !== "badge")
-                              }
-                              rewardTypeCounts={rewardTypeCounts}
-                              onRewardTypesChange={(farmRewardTypes) =>
+                              farmPinnedOnly={settings.platform[platform].farmPinnedOnly}
+                              platform={platform}
+                              rewardFilter={settings.platform[platform].rewardFilter}
+                              rewardKindCounts={rewardKindCounts}
+                              showSubscriptionChoice={subscriptionChoice[platform]}
+                              onRewardFilterChange={(rewardFilter) =>
                                 void updateSettings(
-                                  { platform: { [platform]: { farmRewardTypes } } },
+                                  { platform: { [platform]: { rewardFilter } } },
                                   { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
                                 )
                               }
@@ -1445,7 +1461,10 @@ export function Popup({
                                 void updateSettings({ campaignPins: [] }, { tickAfterSave: true })
                               }
                               onFarmPinnedOnlyChange={(farmPinnedOnly) =>
-                                void updateSettings({ farmPinnedOnly }, { tickAfterSave: true })
+                                void updateSettings(
+                                  { platform: { [platform]: { farmPinnedOnly } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
                               }
                               onRefreshCampaign={() => refreshNow()}
                               onPinChange={(campaignId, position) =>
@@ -1499,7 +1518,7 @@ export function Popup({
                                 )
                               }
                               onOpenGames={() => changeView("games")}
-                              onOpenSettings={() => changeView("settings")}
+                              onOpenSettings={(groupId) => changeView("settings", groupId)}
                             />
                           </>
                         )}

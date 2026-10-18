@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "건너뜀"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 — 보상 필터 밖"
+  },
   "queueActionRequired": {
     "message": "조치 필요"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "그다음 기준"
   },
-  "queueFarmPinnedOnly": {
-    "message": "고정된 항목만 파밍"
-  },
   "queueUnpinAll": {
     "message": "모두 고정 해제 ($1)"
   },
   "queueUnpin": {
     "message": "고정 해제"
-  },
-  "queueFacetLabel": {
-    "message": "캠페인 유형"
-  },
-  "queueFacetAll": {
-    "message": "전체"
-  },
-  "queueFacetNoSubscription": {
-    "message": "구독 불필요"
-  },
-  "queueFacetSubscription": {
-    "message": "구독 필요"
-  },
-  "queueFacetBadge": {
-    "message": "배지"
   },
   "queueFixInclude": {
     "message": "포함"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "이 Twitch 캠페인에는 계정 연결이 필요합니다."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "구독 캠페인 파밍이 꺼져 있습니다."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "이 캠페인은 선택한 카테고리와 일치하지 않습니다."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "지금은 고정된 캠페인만 파밍합니다."
   },
-  "campaignRejectionRewardType": {
-    "message": "보상 중 파밍하는 유형의 보상이 없습니다."
+  "campaignRejectionRewardKind": {
+    "message": "이 캠페인에는 선택한 보상 유형($1)이 없습니다."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "이 캠페인의 보상은 구독이 필요하며, 구독 보상은 건너뛰도록 설정되어 있습니다."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "이 캠페인에는 구독 보상이 없으며, 구독 보상만 파밍하도록 설정되어 있습니다."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "파밍하는 유형의 보상은 이미 획득했습니다."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "끄면 계정 연결이 필요한 캠페인은 건너뜁니다. 켜져 있어도 플랫폼 요건으로 연결이 필요할 수 있습니다."
   },
-  "farmSubscriptionTitle": {
-    "message": "구독이 필요한 캠페인 파밍"
+  "rewardFilterTitle": {
+    "message": "파밍할 보상"
   },
-  "farmSubscriptionDescription": {
-    "message": "끄면 채널 구독이 필요한 보상이 있는 캠페인은 건너뜁니다."
+  "rewardFilterDescription": {
+    "message": "Lurkloot이 $1에서 파밍할 항목입니다. 대기열의 필터 메뉴도 같은 설정을 바꿉니다."
+  },
+  "rewardKindsTitle": {
+    "message": "보상 유형"
+  },
+  "rewardKindsDescription": {
+    "message": "보상의 일부라도 일치하면 파밍합니다."
+  },
+  "rewardKindItem": {
+    "message": "게임 내 아이템"
+  },
+  "rewardKindBadge": {
+    "message": "배지"
+  },
+  "rewardKindEmote": {
+    "message": "이모트"
+  },
+  "rewardKindItemShort": {
+    "message": "아이템"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "구독 보상"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "채널 구독이 필요한 보상입니다."
+  },
+  "subscriptionModeInclude": {
+    "message": "포함"
+  },
+  "subscriptionModeSkip": {
+    "message": "건너뛰기"
+  },
+  "subscriptionModeOnly": {
+    "message": "전용"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "구독 보상도 나머지와 함께 파밍합니다."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "구독이 필요한 보상은 파밍하지 않습니다."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "구독이 필요한 보상만 파밍합니다."
+  },
+  "rewardFilterAll": {
+    "message": "모든 보상"
+  },
+  "rewardFilterAllKinds": {
+    "message": "전체"
+  },
+  "rewardFilterNoSub": {
+    "message": "구독 제외"
+  },
+  "rewardFilterSubOnly": {
+    "message": "구독만"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "고정만"
+  },
+  "rewardFilterReset": {
+    "message": "모든 보상으로 초기화"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "고정된 캠페인만 파밍"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "대기열에서 고정한 캠페인만 $1에서 파밍합니다."
   },
   "forgetExcludedTitle": {
     "message": "제외한 캠페인 잊기"

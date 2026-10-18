@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "متجاوَزة"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 خارج تصفية المكافآت لديك"
+  },
   "queueActionRequired": {
     "message": "يلزم إجراء"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "ثم حسب"
   },
-  "queueFarmPinnedOnly": {
-    "message": "تجميع المثبتة فقط"
-  },
   "queueUnpinAll": {
     "message": "إلغاء تثبيت الكل ($1)"
   },
   "queueUnpin": {
     "message": "إلغاء التثبيت"
-  },
-  "queueFacetLabel": {
-    "message": "الجوائز المراد جمعها"
-  },
-  "queueFacetAll": {
-    "message": "الكل"
-  },
-  "queueFacetNoSubscription": {
-    "message": "بدون اشتراك"
-  },
-  "queueFacetSubscription": {
-    "message": "يتطلب اشتراكًا"
-  },
-  "queueFacetBadge": {
-    "message": "الشارات"
   },
   "queueFixInclude": {
     "message": "تضمين"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "تتطلب حملة Twitch هذه ربط حساب."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "جمع حملات الاشتراك معطّل."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "هذه الحملة لا تطابق الفئات المحددة."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "يتم الآن تجميع الحملات المثبتة فقط."
   },
-  "campaignRejectionRewardType": {
-    "message": "لا تنتمي أي من جوائزها إلى الأنواع التي تجمعها."
+  "campaignRejectionRewardKind": {
+    "message": "لا يوجد هنا ما يطابق أنواع المكافآت التي اخترتها ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "مكافآتها تتطلب اشتراكًا، وأنت تتخطى هذه المكافآت."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "لا تحتوي على مكافآت اشتراك، وأنت تفارم هذه المكافآت فقط."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "جوائزها من الأنواع التي تجمعها مكتسبة بالفعل."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "عند الإيقاف، تُتخطى الحملات التي تتطلب ربط الحساب. قد تظل متطلبات المنصة تفرض الربط عند التشغيل."
   },
-  "farmSubscriptionTitle": {
-    "message": "فارم الحملات التي تتطلب اشتراكًا"
+  "rewardFilterTitle": {
+    "message": "المكافآت للفارم"
   },
-  "farmSubscriptionDescription": {
-    "message": "عند الإيقاف، تُتخطى الحملات التي تحتاج مكافآتها إلى اشتراك في القناة."
+  "rewardFilterDescription": {
+    "message": "ما يفارمه Lurkloot على $1. قائمة التصفية في قائمة الانتظار تغيّر الإعداد نفسه."
+  },
+  "rewardKindsTitle": {
+    "message": "أنواع المكافآت"
+  },
+  "rewardKindsDescription": {
+    "message": "تُفارَم المكافأة إذا تطابق أي جزء منها."
+  },
+  "rewardKindItem": {
+    "message": "عناصر داخل اللعبة"
+  },
+  "rewardKindBadge": {
+    "message": "شارات"
+  },
+  "rewardKindEmote": {
+    "message": "إيموتات"
+  },
+  "rewardKindItemShort": {
+    "message": "عناصر"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "مكافآت الاشتراك"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "المكافآت التي تتطلب الاشتراك في القناة."
+  },
+  "subscriptionModeInclude": {
+    "message": "تضمين"
+  },
+  "subscriptionModeSkip": {
+    "message": "تخطي"
+  },
+  "subscriptionModeOnly": {
+    "message": "فقط"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "تُفارَم مكافآت الاشتراك مع باقي المكافآت."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "لا تُفارَم المكافآت التي تتطلب اشتراكًا."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "تُفارَم المكافآت التي تتطلب اشتراكًا فقط."
+  },
+  "rewardFilterAll": {
+    "message": "كل المكافآت"
+  },
+  "rewardFilterAllKinds": {
+    "message": "الكل"
+  },
+  "rewardFilterNoSub": {
+    "message": "بدون اشتراك"
+  },
+  "rewardFilterSubOnly": {
+    "message": "اشتراك فقط"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "المثبتة فقط"
+  },
+  "rewardFilterReset": {
+    "message": "إعادة الضبط إلى كل المكافآت"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "فارم الحملات المثبتة فقط"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "تُفارَم فقط الحملات التي ثبتّها في قائمة الانتظار على $1."
   },
   "forgetExcludedTitle": {
     "message": "نسيان الحملات المستبعدة"

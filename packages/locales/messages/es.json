@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Omitidas"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 fuera de tu filtro de recompensas"
+  },
   "queueActionRequired": {
     "message": "Requiere acción"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Después por"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farmear solo fijadas"
-  },
   "queueUnpinAll": {
     "message": "Quitar fijadas ($1)"
   },
   "queueUnpin": {
     "message": "Quitar"
-  },
-  "queueFacetLabel": {
-    "message": "Recompensas a farmear"
-  },
-  "queueFacetAll": {
-    "message": "Todas"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Sin suscripción"
-  },
-  "queueFacetSubscription": {
-    "message": "Requiere suscripción"
-  },
-  "queueFacetBadge": {
-    "message": "Insignias"
   },
   "queueFixInclude": {
     "message": "Incluir"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Esta campaña de Twitch requiere vincular una cuenta."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "El farmeo de campañas de suscripción está desactivado."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Esta campaña no coincide con las categorías seleccionadas."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Ahora mismo solo se farmean las campañas fijadas."
   },
-  "campaignRejectionRewardType": {
-    "message": "Ninguna de sus recompensas es de los tipos que farmeas."
+  "campaignRejectionRewardKind": {
+    "message": "Nada aquí coincide con tus tipos de recompensa ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Sus recompensas requieren suscripción, y estás omitiendo esas."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "No tiene recompensas por suscripción, y solo estás farmeando esas."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Sus recompensas de los tipos que farmeas ya están conseguidas."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Si está desactivado, se omiten las campañas que requieren vincular tu cuenta. Los requisitos de la plataforma aún pueden exigir vincularla cuando está activado."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farmear campañas que requieren suscripción"
+  "rewardFilterTitle": {
+    "message": "Recompensas a farmear"
   },
-  "farmSubscriptionDescription": {
-    "message": "Si está desactivado, se omiten las campañas cuyas recompensas requieren una suscripción al canal."
+  "rewardFilterDescription": {
+    "message": "Lo que Lurkloot farmea en $1. El menú de filtros de la Cola cambia el mismo ajuste."
+  },
+  "rewardKindsTitle": {
+    "message": "Tipos de recompensa"
+  },
+  "rewardKindsDescription": {
+    "message": "Una recompensa se farmea si cualquier parte de ella coincide."
+  },
+  "rewardKindItem": {
+    "message": "Objetos del juego"
+  },
+  "rewardKindBadge": {
+    "message": "Insignias"
+  },
+  "rewardKindEmote": {
+    "message": "Emotes"
+  },
+  "rewardKindItemShort": {
+    "message": "Objetos"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Recompensas por suscripción"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Recompensas que requieren una suscripción al canal."
+  },
+  "subscriptionModeInclude": {
+    "message": "Incluir"
+  },
+  "subscriptionModeSkip": {
+    "message": "Omitir"
+  },
+  "subscriptionModeOnly": {
+    "message": "Solo"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Las recompensas por suscripción se farmean junto con el resto."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Las recompensas que requieren suscripción no se farmean."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Solo se farmean las recompensas que requieren suscripción."
+  },
+  "rewardFilterAll": {
+    "message": "Todas las recompensas"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Todas"
+  },
+  "rewardFilterNoSub": {
+    "message": "sin sub"
+  },
+  "rewardFilterSubOnly": {
+    "message": "solo sub"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "solo fijadas"
+  },
+  "rewardFilterReset": {
+    "message": "Restablecer a todas las recompensas"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farmear solo las campañas fijadas"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Solo se farmean en $1 las campañas que fijaste en la Cola."
   },
   "forgetExcludedTitle": {
     "message": "Olvidar campañas excluidas"

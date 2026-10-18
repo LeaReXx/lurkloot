@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Pominięte"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 poza filtrem nagród"
+  },
   "queueActionRequired": {
     "message": "Wymagane działanie"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Następnie według"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farmuj tylko przypięte"
-  },
   "queueUnpinAll": {
     "message": "Odepnij wszystkie ($1)"
   },
   "queueUnpin": {
     "message": "Odepnij"
-  },
-  "queueFacetLabel": {
-    "message": "Typ kampanii"
-  },
-  "queueFacetAll": {
-    "message": "Wszystkie"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Bez subskrypcji"
-  },
-  "queueFacetSubscription": {
-    "message": "Wymaga subskrypcji"
-  },
-  "queueFacetBadge": {
-    "message": "Odznaki"
   },
   "queueFixInclude": {
     "message": "Uwzględnij"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Dla tej kampanii Twitch wymagane jest połączenie konta."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Farmienie kampanii subskrypcyjnych jest wyłączone."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Ta kampania nie pasuje do wybranych kategorii."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Teraz farmione są tylko przypięte kampanie."
   },
-  "campaignRejectionRewardType": {
-    "message": "Żadna z jej nagród nie należy do typów, które farmisz."
+  "campaignRejectionRewardKind": {
+    "message": "Nic tutaj nie pasuje do wybranych typów nagród ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Ich nagrody wymagają subskrypcji, a te pomijasz."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Nie ma w niej nagród za subskrypcję, a farmisz tylko takie."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Nagrody z typów, które farmisz, są już zdobyte."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Gdy wyłączone, kampanie wymagające połączenia konta są pomijane. Wymagania platformy nadal mogą wymagać połączenia, gdy to jest włączone."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farmuj kampanie wymagające subskrypcji"
+  "rewardFilterTitle": {
+    "message": "Nagrody do farmienia"
   },
-  "farmSubscriptionDescription": {
-    "message": "Gdy wyłączone, kampanie, których nagrody wymagają subskrypcji kanału, są pomijane."
+  "rewardFilterDescription": {
+    "message": "Co Lurkloot farmi na $1. Menu filtra w Kolejce zmienia to samo ustawienie."
+  },
+  "rewardKindsTitle": {
+    "message": "Typy nagród"
+  },
+  "rewardKindsDescription": {
+    "message": "Nagroda jest farmiona, jeśli pasuje choć jedna jej część."
+  },
+  "rewardKindItem": {
+    "message": "Przedmioty w grze"
+  },
+  "rewardKindBadge": {
+    "message": "Odznaki"
+  },
+  "rewardKindEmote": {
+    "message": "Emotki"
+  },
+  "rewardKindItemShort": {
+    "message": "Przedmioty"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Nagrody za subskrypcję"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Nagrody wymagające subskrypcji kanału."
+  },
+  "subscriptionModeInclude": {
+    "message": "Uwzględnij"
+  },
+  "subscriptionModeSkip": {
+    "message": "Pomijaj"
+  },
+  "subscriptionModeOnly": {
+    "message": "Tylko"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Nagrody za subskrypcję są farmione razem z resztą."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Nagrody wymagające subskrypcji nie są farmione."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Farmione są tylko nagrody wymagające subskrypcji."
+  },
+  "rewardFilterAll": {
+    "message": "Wszystkie nagrody"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Wszystkie"
+  },
+  "rewardFilterNoSub": {
+    "message": "bez subów"
+  },
+  "rewardFilterSubOnly": {
+    "message": "tylko suby"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "tylko przypięte"
+  },
+  "rewardFilterReset": {
+    "message": "Przywróć wszystkie nagrody"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farmuj tylko przypięte kampanie"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Na $1 farmowane są tylko kampanie przypięte w Kolejce."
   },
   "forgetExcludedTitle": {
     "message": "Zapomnij wykluczone kampanie"

@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Übersprungen"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 außerhalb deines Belohnungsfilters"
+  },
   "queueActionRequired": {
     "message": "Aktion erforderlich"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Danach nach"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Nur angeheftete farmen"
-  },
   "queueUnpinAll": {
     "message": "Alle lösen ($1)"
   },
   "queueUnpin": {
     "message": "Lösen"
-  },
-  "queueFacetLabel": {
-    "message": "Zu farmende Belohnungen"
-  },
-  "queueFacetAll": {
-    "message": "Alle"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Ohne Abo"
-  },
-  "queueFacetSubscription": {
-    "message": "Abo erforderlich"
-  },
-  "queueFacetBadge": {
-    "message": "Abzeichen"
   },
   "queueFixInclude": {
     "message": "Aufnehmen"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Für diese Twitch-Kampagne muss ein Konto verknüpft sein."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Abonnement-Kampagnen werden nicht gefarmt."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Diese Kampagne entspricht nicht den ausgewählten Kategorien."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Derzeit werden nur angeheftete Kampagnen gefarmt."
   },
-  "campaignRejectionRewardType": {
-    "message": "Keine ihrer Belohnungen gehört zu den Typen, die du farmst."
+  "campaignRejectionRewardKind": {
+    "message": "Nichts hier passt zu deinen Belohnungstypen ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Die Belohnungen benötigen ein Abo, und du überspringst diese."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Sie haben keine Abo-Belohnungen, und du farmst nur diese."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Ihre Belohnungen der Typen, die du farmst, sind verdient."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Wenn aus, werden Kampagnen übersprungen, die eine Kontoverknüpfung erfordern. Plattformvorgaben können die Verknüpfung auch bei aktivierter Option verlangen."
   },
-  "farmSubscriptionTitle": {
-    "message": "Kampagnen farmen, die ein Abo erfordern"
+  "rewardFilterTitle": {
+    "message": "Zu farmende Belohnungen"
   },
-  "farmSubscriptionDescription": {
-    "message": "Wenn aus, werden Kampagnen übersprungen, deren Belohnungen ein Kanal-Abo erfordern."
+  "rewardFilterDescription": {
+    "message": "Was Lurkloot auf $1 farmt. Das Filtermenü in der Warteschlange ändert dieselbe Einstellung."
+  },
+  "rewardKindsTitle": {
+    "message": "Belohnungstypen"
+  },
+  "rewardKindsDescription": {
+    "message": "Eine Belohnung wird gefarmt, wenn irgendein Teil davon passt."
+  },
+  "rewardKindItem": {
+    "message": "Ingame-Items"
+  },
+  "rewardKindBadge": {
+    "message": "Abzeichen"
+  },
+  "rewardKindEmote": {
+    "message": "Emotes"
+  },
+  "rewardKindItemShort": {
+    "message": "Items"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Abo-Belohnungen"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Belohnungen, die ein Kanal-Abo voraussetzen."
+  },
+  "subscriptionModeInclude": {
+    "message": "Einbeziehen"
+  },
+  "subscriptionModeSkip": {
+    "message": "Auslassen"
+  },
+  "subscriptionModeOnly": {
+    "message": "Nur"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Abo-Belohnungen werden zusammen mit den übrigen gefarmt."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Belohnungen, die ein Abo voraussetzen, werden nicht gefarmt."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Nur Belohnungen, die ein Abo voraussetzen, werden gefarmt."
+  },
+  "rewardFilterAll": {
+    "message": "Alle Belohnungen"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Alle"
+  },
+  "rewardFilterNoSub": {
+    "message": "ohne Abo"
+  },
+  "rewardFilterSubOnly": {
+    "message": "nur Abo"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "nur angeheftet"
+  },
+  "rewardFilterReset": {
+    "message": "Auf alle Belohnungen zurücksetzen"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Nur angeheftete Kampagnen farmen"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Auf $1 werden nur Kampagnen gefarmt, die du in der Warteschlange angeheftet hast."
   },
   "forgetExcludedTitle": {
     "message": "Ausgeschlossene Kampagnen vergessen"

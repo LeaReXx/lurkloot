@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Пропущенные"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 вне фильтра наград"
+  },
   "queueActionRequired": {
     "message": "Требуется действие"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Затем по"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Фармить только закреплённые"
-  },
   "queueUnpinAll": {
     "message": "Открепить все ($1)"
   },
   "queueUnpin": {
     "message": "Открепить"
-  },
-  "queueFacetLabel": {
-    "message": "Какие награды фармить"
-  },
-  "queueFacetAll": {
-    "message": "Все"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Без подписки"
-  },
-  "queueFacetSubscription": {
-    "message": "Нужна подписка"
-  },
-  "queueFacetBadge": {
-    "message": "Значки"
   },
   "queueFixInclude": {
     "message": "Вернуть"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Для этой кампании Twitch требуется привязка учётной записи."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Фарминг кампаний с подпиской отключён."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Эта кампания не соответствует выбранным категориям."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Сейчас фармятся только закреплённые кампании."
   },
-  "campaignRejectionRewardType": {
-    "message": "Ни одна её награда не относится к типам, которые вы фармите."
+  "campaignRejectionRewardKind": {
+    "message": "Здесь нет наград выбранных типов ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Её награды требуют подписку, а вы их пропускаете."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "В ней нет наград за подписку, а вы фармите только их."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Её награды тех типов, что вы фармите, уже получены."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Когда выключено, кампании, требующие привязки аккаунта, пропускаются. Требования платформы могут всё равно требовать привязку, когда настройка включена."
   },
-  "farmSubscriptionTitle": {
-    "message": "Фармить кампании, требующие подписки"
+  "rewardFilterTitle": {
+    "message": "Награды для фарма"
   },
-  "farmSubscriptionDescription": {
-    "message": "Когда выключено, кампании, награды которых требуют подписки на канал, пропускаются."
+  "rewardFilterDescription": {
+    "message": "Что Lurkloot фармит на $1. Меню фильтра в очереди меняет ту же настройку."
+  },
+  "rewardKindsTitle": {
+    "message": "Типы наград"
+  },
+  "rewardKindsDescription": {
+    "message": "Награда фармится, если подходит хотя бы её часть."
+  },
+  "rewardKindItem": {
+    "message": "Внутриигровые предметы"
+  },
+  "rewardKindBadge": {
+    "message": "Значки"
+  },
+  "rewardKindEmote": {
+    "message": "Эмоуты"
+  },
+  "rewardKindItemShort": {
+    "message": "Предметы"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Награды за подписку"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Награды, для которых нужна подписка на канал."
+  },
+  "subscriptionModeInclude": {
+    "message": "Учитывать"
+  },
+  "subscriptionModeSkip": {
+    "message": "Пропускать"
+  },
+  "subscriptionModeOnly": {
+    "message": "Только"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Награды за подписку фармятся вместе с остальными."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Награды, для которых нужна подписка, не фармятся."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Фармятся только награды, для которых нужна подписка."
+  },
+  "rewardFilterAll": {
+    "message": "Все награды"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Все"
+  },
+  "rewardFilterNoSub": {
+    "message": "без подп."
+  },
+  "rewardFilterSubOnly": {
+    "message": "только подп."
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "только закреплённые"
+  },
+  "rewardFilterReset": {
+    "message": "Сбросить: все награды"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Фармить только закреплённые кампании"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "На $1 фармятся только кампании, которые вы закрепили в очереди."
   },
   "forgetExcludedTitle": {
     "message": "Забыть исключённые кампании"

@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "已跳过"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 不在你的奖励筛选范围内"
+  },
   "queueActionRequired": {
     "message": "需要操作"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "然后按"
   },
-  "queueFarmPinnedOnly": {
-    "message": "只挂机已置顶"
-  },
   "queueUnpinAll": {
     "message": "取消全部置顶（$1）"
   },
   "queueUnpin": {
     "message": "取消置顶"
-  },
-  "queueFacetLabel": {
-    "message": "要挂机的奖励"
-  },
-  "queueFacetAll": {
-    "message": "全部"
-  },
-  "queueFacetNoSubscription": {
-    "message": "无需订阅"
-  },
-  "queueFacetSubscription": {
-    "message": "需要订阅"
-  },
-  "queueFacetBadge": {
-    "message": "徽章"
   },
   "queueFixInclude": {
     "message": "重新加入"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "此 Twitch 掉宝活动要求关联账号。"
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "已关闭订阅活动的挂机功能。"
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "此掉宝活动不属于所选分类。"
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "当前只挂机已置顶的掉宝活动。"
   },
-  "campaignRejectionRewardType": {
-    "message": "其奖励都不属于你挂机的类型。"
+  "campaignRejectionRewardKind": {
+    "message": "这里没有符合你奖励类型（$1）的内容。"
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "其奖励需要订阅，而你设置了跳过这些奖励。"
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "它没有订阅奖励，而你只挂机这些奖励。"
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "其属于你挂机类型的奖励已获得。"
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "关闭后，将跳过尚未关联账号的掉宝活动。开启后，仍须遵守平台的账号关联要求。"
   },
-  "farmSubscriptionTitle": {
-    "message": "挂机需订阅的掉宝活动"
+  "rewardFilterTitle": {
+    "message": "要挂机的奖励"
   },
-  "farmSubscriptionDescription": {
-    "message": "关闭后，将跳过需要订阅频道才能获得奖励的掉宝活动。"
+  "rewardFilterDescription": {
+    "message": "Lurkloot 在 $1 上挂机的奖励。队列中的筛选菜单会更改同一设置。"
+  },
+  "rewardKindsTitle": {
+    "message": "奖励类型"
+  },
+  "rewardKindsDescription": {
+    "message": "奖励的任一部分符合时即会挂机。"
+  },
+  "rewardKindItem": {
+    "message": "游戏内物品"
+  },
+  "rewardKindBadge": {
+    "message": "徽章"
+  },
+  "rewardKindEmote": {
+    "message": "表情"
+  },
+  "rewardKindItemShort": {
+    "message": "物品"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "订阅奖励"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "需要频道订阅的奖励。"
+  },
+  "subscriptionModeInclude": {
+    "message": "包含"
+  },
+  "subscriptionModeSkip": {
+    "message": "跳过"
+  },
+  "subscriptionModeOnly": {
+    "message": "仅限"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "订阅奖励与其他奖励一同挂机。"
+  },
+  "subscriptionModeSkipHint": {
+    "message": "需要订阅的奖励不会挂机。"
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "仅挂机需要订阅的奖励。"
+  },
+  "rewardFilterAll": {
+    "message": "所有奖励"
+  },
+  "rewardFilterAllKinds": {
+    "message": "全部"
+  },
+  "rewardFilterNoSub": {
+    "message": "无订阅"
+  },
+  "rewardFilterSubOnly": {
+    "message": "仅订阅"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "仅置顶"
+  },
+  "rewardFilterReset": {
+    "message": "重置为所有奖励"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "仅挂机已置顶的活动"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "在 $1 上，仅挂机你在队列中置顶的活动。"
   },
   "forgetExcludedTitle": {
     "message": "恢复已排除的活动"

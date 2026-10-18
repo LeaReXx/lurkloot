@@ -356,7 +356,6 @@ describe("i18n", () => {
       // "Badge" is the French and Italian word too.
       "rewardBadge",
       "rewardBadgeNamed",
-      "queueFacetBadge",
       // "Beta" is the same word in Spanish, German, Italian, Portuguese and Turkish.
       "navBeta",
       // Provider names, which are brands and never translated.
@@ -379,10 +378,21 @@ describe("i18n", () => {
       "kickLevelShort",
     ]);
 
+    // Loanwords that are correct as written in these languages.
+    const loanwords: Record<string, Set<string>> = {
+      de: new Set(["rewardKindEmote", "rewardKindItemShort"]),
+      es: new Set(["rewardKindEmote"]),
+      pt_BR: new Set(["rewardKindEmote"]),
+      fr: new Set(["rewardKindBadge"]),
+    };
+
     for (const locale of localeCodes().filter((entry) => entry !== "en")) {
       const catalog = readCatalog(locale);
       const unchanged = Object.keys(english).filter(
-        (key) => catalog[key]?.message === english[key]?.message && !allowedSameAsEnglish.has(key),
+        (key) =>
+          catalog[key]?.message === english[key]?.message
+          && !allowedSameAsEnglish.has(key)
+          && !loanwords[locale]?.has(key),
       );
       expect(unchanged, locale).toEqual([]);
     }

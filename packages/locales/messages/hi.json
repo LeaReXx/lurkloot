@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "छोड़े गए"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 आपके रिवॉर्ड फ़िल्टर से बाहर"
+  },
   "queueActionRequired": {
     "message": "कार्रवाई आवश्यक"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "फिर इसके अनुसार"
   },
-  "queueFarmPinnedOnly": {
-    "message": "सिर्फ़ पिन किए गए फ़ार्म करें"
-  },
   "queueUnpinAll": {
     "message": "सभी अनपिन करें ($1)"
   },
   "queueUnpin": {
     "message": "अनपिन"
-  },
-  "queueFacetLabel": {
-    "message": "फ़ार्म करने वाले इनाम"
-  },
-  "queueFacetAll": {
-    "message": "सभी"
-  },
-  "queueFacetNoSubscription": {
-    "message": "सब्सक्रिप्शन नहीं"
-  },
-  "queueFacetSubscription": {
-    "message": "सब्सक्रिप्शन ज़रूरी"
-  },
-  "queueFacetBadge": {
-    "message": "बैज"
   },
   "queueFixInclude": {
     "message": "शामिल करें"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "इस Twitch कैंपेन के लिए खाता लिंक करना आवश्यक है।"
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "सब्सक्रिप्शन कैंपेन फ़ार्मिंग बंद है।"
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "यह कैंपेन चुनी गई कैटेगरी से मेल नहीं खाता।"
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "अभी सिर्फ़ पिन किए गए कैंपेन फ़ार्म होते हैं।"
   },
-  "campaignRejectionRewardType": {
-    "message": "इसका कोई भी इनाम आपके फ़ार्म किए जाने वाले प्रकारों का नहीं है।"
+  "campaignRejectionRewardKind": {
+    "message": "यहाँ आपके चुने रिवॉर्ड प्रकार ($1) से कुछ भी मेल नहीं खाता।"
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "इसके रिवॉर्ड के लिए सदस्यता चाहिए, और आपने वे छोड़ने के लिए चुने हैं।"
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "इसमें कोई सदस्यता रिवॉर्ड नहीं है, और आप केवल वही फ़ार्म कर रहे हैं।"
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "आपके फ़ार्म किए जाने वाले प्रकारों के इसके इनाम मिल चुके हैं।"
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "बंद होने पर, खाता लिंक करने वाले कैंपेन छोड़ दिए जाते हैं। चालू होने पर भी प्लेटफ़ॉर्म के नियम लिंक करना आवश्यक बना सकते हैं।"
   },
-  "farmSubscriptionTitle": {
-    "message": "सब्सक्रिप्शन वाले कैंपेन फ़ार्म करें"
+  "rewardFilterTitle": {
+    "message": "फ़ार्म करने वाले रिवॉर्ड"
   },
-  "farmSubscriptionDescription": {
-    "message": "बंद होने पर, जिन कैंपेन के इनाम के लिए चैनल सब्सक्रिप्शन ज़रूरी है, उन्हें छोड़ दिया जाता है।"
+  "rewardFilterDescription": {
+    "message": "$1 पर Lurkloot किन रिवॉर्ड को फ़ार्म करता है। क़तार के फ़िल्टर मेनू में भी यही सेटिंग बदलती है।"
+  },
+  "rewardKindsTitle": {
+    "message": "रिवॉर्ड के प्रकार"
+  },
+  "rewardKindsDescription": {
+    "message": "रिवॉर्ड का कोई भी हिस्सा मेल खाए, तो वह फ़ार्म किया जाता है।"
+  },
+  "rewardKindItem": {
+    "message": "इन-गेम आइटम"
+  },
+  "rewardKindBadge": {
+    "message": "बैज"
+  },
+  "rewardKindEmote": {
+    "message": "इमोट"
+  },
+  "rewardKindItemShort": {
+    "message": "आइटम"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "सदस्यता रिवॉर्ड"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "वे रिवॉर्ड जिनके लिए चैनल की सदस्यता चाहिए।"
+  },
+  "subscriptionModeInclude": {
+    "message": "शामिल"
+  },
+  "subscriptionModeSkip": {
+    "message": "छोड़ें"
+  },
+  "subscriptionModeOnly": {
+    "message": "केवल"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "सदस्यता वाले रिवॉर्ड बाकी रिवॉर्ड के साथ फ़ार्म किए जाते हैं।"
+  },
+  "subscriptionModeSkipHint": {
+    "message": "जिन रिवॉर्ड के लिए सदस्यता चाहिए, वे फ़ार्म नहीं किए जाते।"
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "केवल वे रिवॉर्ड फ़ार्म किए जाते हैं जिनके लिए सदस्यता चाहिए।"
+  },
+  "rewardFilterAll": {
+    "message": "सभी रिवॉर्ड"
+  },
+  "rewardFilterAllKinds": {
+    "message": "सभी"
+  },
+  "rewardFilterNoSub": {
+    "message": "बिना सदस्यता"
+  },
+  "rewardFilterSubOnly": {
+    "message": "केवल सदस्यता"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "केवल पिन किए गए"
+  },
+  "rewardFilterReset": {
+    "message": "सभी रिवॉर्ड पर वापस जाएँ"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "केवल पिन किए गए कैंपेन फ़ार्म करें"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "$1 पर केवल वे कैंपेन फ़ार्म होंगे जो आपने क़तार में पिन किए हैं।"
   },
   "forgetExcludedTitle": {
     "message": "हटाए गए कैंपेन भूलें"

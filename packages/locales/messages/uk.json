@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "Пропущені"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 поза вашим фільтром нагород"
+  },
   "queueActionRequired": {
     "message": "Потрібна дія"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "Потім за"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Фармити лише закріплені"
-  },
   "queueUnpinAll": {
     "message": "Відкріпити всі ($1)"
   },
   "queueUnpin": {
     "message": "Відкріпити"
-  },
-  "queueFacetLabel": {
-    "message": "Тип кампанії"
-  },
-  "queueFacetAll": {
-    "message": "Усі"
-  },
-  "queueFacetNoSubscription": {
-    "message": "Без підписки"
-  },
-  "queueFacetSubscription": {
-    "message": "Потрібна підписка"
-  },
-  "queueFacetBadge": {
-    "message": "Значки"
   },
   "queueFixInclude": {
     "message": "Включити"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "Для цієї кампанії Twitch потрібне прив’язування облікового запису."
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Фарм кампаній за підпискою вимкнено."
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "Ця кампанія не відповідає обраним категоріям."
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "Зараз фармляться лише закріплені кампанії."
   },
-  "campaignRejectionRewardType": {
-    "message": "Жодна з її нагород не належить до типів, які ви фармите."
+  "campaignRejectionRewardKind": {
+    "message": "Тут немає нічого з ваших типів нагород ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Її нагороди потребують підписки, а ви їх пропускаєте."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "У ній немає нагород за підписку, а ви фармите лише їх."
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "Нагороди її типів, які ви фармите, уже отримано."
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "Коли вимкнено, кампанії, що потребують прив’язки облікового запису, пропускаються. Вимоги платформи все одно можуть вимагати прив’язку, коли це увімкнено."
   },
-  "farmSubscriptionTitle": {
-    "message": "Фармити кампанії, що потребують підписки"
+  "rewardFilterTitle": {
+    "message": "Нагороди для фарму"
   },
-  "farmSubscriptionDescription": {
-    "message": "Коли вимкнено, кампанії, нагороди яких потребують підписки на канал, пропускаються."
+  "rewardFilterDescription": {
+    "message": "Що Lurkloot фармить на $1. Меню фільтра в черзі змінює те саме налаштування."
+  },
+  "rewardKindsTitle": {
+    "message": "Типи нагород"
+  },
+  "rewardKindsDescription": {
+    "message": "Нагорода фармиться, якщо підходить будь-яка її частина."
+  },
+  "rewardKindItem": {
+    "message": "Внутрішньоігрові предмети"
+  },
+  "rewardKindBadge": {
+    "message": "Значки"
+  },
+  "rewardKindEmote": {
+    "message": "Емоути"
+  },
+  "rewardKindItemShort": {
+    "message": "Предмети"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Нагороди за підписку"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Нагороди, для яких потрібна підписка на канал."
+  },
+  "subscriptionModeInclude": {
+    "message": "Включити"
+  },
+  "subscriptionModeSkip": {
+    "message": "Пропустити"
+  },
+  "subscriptionModeOnly": {
+    "message": "Лише"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Нагороди за підписку фармляться разом з іншими."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Нагороди, для яких потрібна підписка, не фармляться."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Фармляться лише нагороди, для яких потрібна підписка."
+  },
+  "rewardFilterAll": {
+    "message": "Усі нагороди"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Усі"
+  },
+  "rewardFilterNoSub": {
+    "message": "без підписки"
+  },
+  "rewardFilterSubOnly": {
+    "message": "лише з підпискою"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "лише закріплені"
+  },
+  "rewardFilterReset": {
+    "message": "Скинути до всіх нагород"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Фармити лише закріплені кампанії"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "На $1 фармляться лише кампанії, які ви закріпили в черзі."
   },
   "forgetExcludedTitle": {
     "message": "Забути виключені кампанії"

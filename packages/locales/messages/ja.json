@@ -116,6 +116,9 @@
   "queueSkipped": {
     "message": "スキップ"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 は報酬フィルターの対象外"
+  },
   "queueActionRequired": {
     "message": "要対応"
   },
@@ -128,29 +131,11 @@
   "queueStrategyLabel": {
     "message": "次に"
   },
-  "queueFarmPinnedOnly": {
-    "message": "ピン留めのみファーム"
-  },
   "queueUnpinAll": {
     "message": "すべてのピン留めを外す（$1）"
   },
   "queueUnpin": {
     "message": "ピン留めを外す"
-  },
-  "queueFacetLabel": {
-    "message": "キャンペーン種別"
-  },
-  "queueFacetAll": {
-    "message": "すべて"
-  },
-  "queueFacetNoSubscription": {
-    "message": "サブスク不要"
-  },
-  "queueFacetSubscription": {
-    "message": "サブスク必要"
-  },
-  "queueFacetBadge": {
-    "message": "バッジ"
   },
   "queueFixInclude": {
     "message": "含める"
@@ -782,9 +767,6 @@
   "campaignRejectionTwitchLinkRequired": {
     "message": "この Twitch キャンペーンにはアカウント連携が必要です。"
   },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "サブスクキャンペーンのファームは無効です。"
-  },
   "campaignRejectionCategoryFiltered": {
     "message": "このキャンペーンは選択したカテゴリと一致しません。"
   },
@@ -794,8 +776,14 @@
   "campaignRejectionNotPinned": {
     "message": "現在はピン留めされたキャンペーンのみファームしています。"
   },
-  "campaignRejectionRewardType": {
-    "message": "このキャンペーンの報酬に、ファームする種類のものはありません。"
+  "campaignRejectionRewardKind": {
+    "message": "ファームする報酬の種類（$1）に一致するものはありません。"
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "報酬にはサブスクが必要ですが、それらはスキップする設定です。"
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "このキャンペーンにサブスク報酬はなく、サブスク報酬のみファームする設定です。"
   },
   "campaignRejectionRewardTypesObtained": {
     "message": "ファームする種類の報酬はすでに獲得済みです。"
@@ -950,11 +938,77 @@
   "farmUnlinkedDescription": {
     "message": "オフのとき、アカウント連携が必要なキャンペーンはスキップされます。オンでもプラットフォーム要件で連携が必要な場合があります。"
   },
-  "farmSubscriptionTitle": {
-    "message": "サブスクが必要なキャンペーンをファーム"
+  "rewardFilterTitle": {
+    "message": "ファームする報酬"
   },
-  "farmSubscriptionDescription": {
-    "message": "オフのとき、チャンネルサブスクが必要な報酬のキャンペーンはスキップされます。"
+  "rewardFilterDescription": {
+    "message": "Lurkloot が $1 でファームするもの。キューのフィルターメニューでも同じ設定を変更できます。"
+  },
+  "rewardKindsTitle": {
+    "message": "報酬の種類"
+  },
+  "rewardKindsDescription": {
+    "message": "報酬の一部でも一致すればファームされます。"
+  },
+  "rewardKindItem": {
+    "message": "ゲーム内アイテム"
+  },
+  "rewardKindBadge": {
+    "message": "バッジ"
+  },
+  "rewardKindEmote": {
+    "message": "エモート"
+  },
+  "rewardKindItemShort": {
+    "message": "アイテム"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "サブスク報酬"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "チャンネルのサブスクが必要な報酬。"
+  },
+  "subscriptionModeInclude": {
+    "message": "含める"
+  },
+  "subscriptionModeSkip": {
+    "message": "スキップ"
+  },
+  "subscriptionModeOnly": {
+    "message": "限定"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "サブスク報酬も他の報酬と一緒にファームされます。"
+  },
+  "subscriptionModeSkipHint": {
+    "message": "サブスクが必要な報酬はファームされません。"
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "サブスクが必要な報酬だけがファームされます。"
+  },
+  "rewardFilterAll": {
+    "message": "すべての報酬"
+  },
+  "rewardFilterAllKinds": {
+    "message": "すべて"
+  },
+  "rewardFilterNoSub": {
+    "message": "サブなし"
+  },
+  "rewardFilterSubOnly": {
+    "message": "サブのみ"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "ピン留めのみ"
+  },
+  "rewardFilterReset": {
+    "message": "すべての報酬に戻す"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "ピン留めしたキャンペーンのみファーム"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "キューでピン留めしたキャンペーンだけを $1 でファームします。"
   },
   "forgetExcludedTitle": {
     "message": "除外したキャンペーンを忘れる"

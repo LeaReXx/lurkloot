@@ -2,10 +2,12 @@ import type {
   CategorySelection,
   DropCampaign,
   ExtensionSettings,
-  RewardFarmType,
   Platform,
+  RewardFilter,
+  RewardKind,
   WatchSession,
 } from "@lurkloot/shared/models";
+import { PLATFORM_REWARD_KINDS, REWARD_KINDS } from "@lurkloot/shared/rewardFilter";
 import {
   NO_CATEGORY_ID,
   categoryListIndex,
@@ -24,9 +26,9 @@ import {
   rewardBadgeBenefit,
   rewardRequirementType,
   rewardFeasibility,
+  rewardRequiresSubscription,
 } from "@lurkloot/shared/rewards";
 import { isCampaignExpired, isCampaignFinished } from "@lurkloot/shared/campaignFilters";
-import { REWARD_FARM_TYPES } from "@lurkloot/shared/settings";
 import {
   campaignFarmingBlockers,
   OUTSIDE_ACTION_REJECTION_CODES,
@@ -389,40 +391,52 @@ function safeClaimGuidance(guidance: DropCampaign["claimGuidance"]): DropCampaig
   }
 }
 
-// How many campaigns each Queue tab would farm: the Queue's own section test,
-// under each campaign type in turn, so a tab's count is the queue it switches to.
-// How many campaigns each Queue tab would farm on its own: the Queue's own
-// section test with only that type selected ("all" with none), so a tab's
-// count is the queue it narrows to.
-export type RewardTypeTab = "all" | RewardFarmType;
-
-export function farmRewardTypeCounts(
+// How many campaigns the Queue would hold with each reward kind selected on
+// its own, keeping the current subscription mode: the Queue's own section
+// test, so a kind's count is the queue it narrows to. Kinds the platform
+// cannot farm count nothing.
+export function rewardKindCounts(
   campaigns: readonly DropCampaign[],
   settings: ExtensionSettings,
-): Record<RewardTypeTab, number> {
+  platform: Platform,
+): Record<RewardKind, number> {
+  const platformSettings = settings.platform[platform];
   const marked = campaigns.map((campaign) =>
-    applySubscriptionMarks(
-      campaign,
-      settings.platform[campaign.platform].subscribedRewardMarks ?? [],
-    ),
+    applySubscriptionMarks(campaign, platformSettings.subscribedRewardMarks ?? []),
   );
-  const tabs: RewardTypeTab[] = ["all", ...REWARD_FARM_TYPES];
+  const supported = PLATFORM_REWARD_KINDS[platform];
   return Object.fromEntries(
-    tabs.map((tab) => {
-      const types: RewardFarmType[] = tab === "all" ? [] : [tab];
-      const typed = (campaign: DropCampaign): ExtensionSettings => ({
+    REWARD_KINDS.map((kind) => {
+      if (!supported.includes(kind)) return [kind, 0];
+      const only: ExtensionSettings = {
         ...settings,
         platform: {
           ...settings.platform,
-          [campaign.platform]: { ...settings.platform[campaign.platform], farmRewardTypes: types },
+          [platform]: {
+            ...platformSettings,
+            rewardFilter: { ...platformSettings.rewardFilter, kinds: [kind] },
+          },
         },
-      });
+      };
       return [
-        tab,
-        marked.filter((campaign) => campaignSection(campaign, typed(campaign)) === "queue").length,
+        kind,
+        marked.filter((campaign) => campaignSection(campaign, only) === "queue").length,
       ];
     }),
-  ) as Record<RewardTypeTab, number>;
+  ) as Record<RewardKind, number>;
+}
+
+// Whether the subscription question is worth asking: some campaign has a
+// reward that needs a subscription, or the user already narrowed it and must
+// always be able to undo that.
+export function showsSubscriptionChoice(
+  campaigns: readonly DropCampaign[],
+  filter: RewardFilter,
+): boolean {
+  return (
+    filter.subscriptions !== "include"
+    || campaigns.some((campaign) => campaign.rewards.some(rewardRequiresSubscription))
+  );
 }
 
 export function campaignLifecycleState(campaign: DropCampaign): CampaignLifecycleState | undefined {
