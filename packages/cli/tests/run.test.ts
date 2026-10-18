@@ -300,8 +300,9 @@ describe("CLI scheduler tick baseline", () => {
           // #591 the CLI runs both tick jobs, like the extension, so the disabled
           // platform's ticks construct its adapter as well. This watcher has no
           // poll between health commits, so the watch job keeps its one-minute
-          // period and adds no wake of its own.
-          adapterConstructions: platform === "twitch" ? 10 : 8,
+          // period and adds no wake of its own. The account-progress job builds
+          // the enabled platform's adapter once to learn whether it reads any.
+          adapterConstructions: platform === "twitch" ? 11 : 9,
           watcherReconciliations: 1,
         });
         expect(result.durationsMs).toEqual({
@@ -818,6 +819,13 @@ describe("runLoop heartbeat driver", () => {
       await vi.advanceTimersByTimeAsync(60_000);
       await vi.waitFor(() => expect(watcher.tick).toHaveBeenCalledTimes(1));
       expect(twitch.refreshCampaigns).toHaveBeenCalledTimes(1);
+      // The attempt stays in flight until its result is stored, and a heartbeat
+      // fired meanwhile joins it instead of ticking again. Wait for the store,
+      // or the next minute's fire can land while the file write is still out.
+      await vi.waitFor(async () => {
+        const state = JSON.parse(await readFile(statePath, "utf8")) as SchedulerState;
+        expect(state.sessions.twitch.lastHeartbeatAt).toBeDefined();
+      });
 
       await vi.advanceTimersByTimeAsync(60_000);
       await vi.waitFor(() => expect(watcher.tick).toHaveBeenCalledTimes(2));
@@ -1027,9 +1035,9 @@ describe("runLoop heartbeat driver", () => {
       },
     });
 
-    // The Twitch and Kick tick jobs, the heartbeat job and (since #590) the
-    // one-minute channel-points job.
-    expect(vi.getTimerCount()).toBe(4);
+    // The Twitch and Kick tick jobs, the heartbeat job, (since #590) the
+    // one-minute channel-points job and the one-minute account-progress job.
+    expect(vi.getTimerCount()).toBe(5);
     process.emit("SIGTERM");
     await disposeStarted.promise;
     expect(timerCountsAtDispose).toEqual([0]);

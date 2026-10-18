@@ -47,6 +47,24 @@
   "languageTurkish": {
     "message": "Türkçe"
   },
+  "languageJapanese": {
+    "message": "Japonca"
+  },
+  "languageIndonesian": {
+    "message": "Endonezce"
+  },
+  "languagePolish": {
+    "message": "Lehçe"
+  },
+  "languageKorean": {
+    "message": "Korece"
+  },
+  "languageUkrainian": {
+    "message": "Ukraynaca"
+  },
+  "languageCzech": {
+    "message": "Çekçe"
+  },
   "settingsLanguageTitle": {
     "message": "Dil"
   },
@@ -98,6 +116,9 @@
   "queueSkipped": {
     "message": "Atlanan"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 ödül filtrenin dışında"
+  },
   "queueActionRequired": {
     "message": "İşlem gerekli"
   },
@@ -110,32 +131,20 @@
   "queueStrategyLabel": {
     "message": "Sonra şuna göre"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Yalnızca sabitlenenleri farmla"
-  },
   "queueUnpinAll": {
     "message": "Tümünü kaldır ($1)"
   },
   "queueUnpin": {
     "message": "Kaldır"
   },
-  "queueFacetLabel": {
-    "message": "Kampanya türü"
-  },
-  "queueFacetAll": {
-    "message": "Tümü"
-  },
-  "queueFacetDrops": {
-    "message": "Drop'lar"
-  },
-  "queueFacetBadges": {
-    "message": "Abone rozetleri"
-  },
   "queueFixInclude": {
     "message": "Dahil et"
   },
   "queueFixPin": {
     "message": "Sabitle"
+  },
+  "queueFixFarmAll": {
+    "message": "Tümünü farm'la"
   },
   "queueFixGames": {
     "message": "Oyunları aç"
@@ -146,8 +155,8 @@
   "queueEmpty": {
     "message": "Şu anda burada farmlanacak bir şey yok."
   },
-  "queueEmptyBadges": {
-    "message": "Şu anda farmlanabilir abonelik kampanyası yok."
+  "queueEmptyRewardTypes": {
+    "message": "Şu anda seçilen türlerden farm'lanabilir bir şey yok."
   },
   "completedTabFinished": {
     "message": "Tamamlanan"
@@ -370,6 +379,18 @@
   },
   "subscriptionProgressUnknown": {
     "message": "İlerleme bilinmiyor"
+  },
+  "rewardBadge": {
+    "message": "Rozet"
+  },
+  "rewardBadgeNamed": {
+    "message": "Rozet: $1"
+  },
+  "rewardAlsoWatch": {
+    "message": "Artı $1 izleme"
+  },
+  "rewardClaimable": {
+    "message": "Alınmaya hazır"
   },
   "notEarnableByWatching": {
     "message": "İzleyerek kazanılamaz"
@@ -741,13 +762,10 @@
     "message": "Bu kampanyadaki tüm ödüller tamamlandı."
   },
   "campaignRejectionUnlinkedDisabled": {
-    "message": "Bağlı hesap olmadan kampanya farmlama kapalı."
+    "message": "Bağlı hesabı olmayan kampanyalar Atla olarak ayarlandı."
   },
   "campaignRejectionTwitchLinkRequired": {
     "message": "Bu Twitch kampanyası için hesap bağlamak gerekir."
-  },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Abonelik kampanyalarını farmlama kapalı."
   },
   "campaignRejectionCategoryFiltered": {
     "message": "Bu kampanya seçili kategorilerle eşleşmiyor."
@@ -757,6 +775,18 @@
   },
   "campaignRejectionNotPinned": {
     "message": "Şu anda yalnızca sabitlenmiş kampanyalar farmlanıyor."
+  },
+  "campaignRejectionRewardKind": {
+    "message": "Burada seçtiğin ödül türlerine ($1) uyan bir şey yok."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Ödülleri bir abonelik gerektiriyor ve bunları atlıyorsun."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Abonelik ödülü içermiyor ve yalnızca bunları farmlıyorsun."
+  },
+  "campaignRejectionRewardTypesObtained": {
+    "message": "Farm'ladığınız türlerdeki ödülleri kazanıldı."
   },
   "campaignRejectionNoRewards": {
     "message": "Bu kampanyada farmlanabilir ödül yok."
@@ -902,17 +932,116 @@
   "activityLogLevelsDescription": {
     "message": "Hangi işlemlerin geçmişe kaydedileceğini seçin."
   },
-  "farmUnlinkedTitle": {
-    "message": "Bağlı hesabı olmayan kampanyaları farmla"
+  "rewardFilterTitle": {
+    "message": "Farmlanacak ödüller"
   },
-  "farmUnlinkedDescription": {
-    "message": "Kapalıyken, hesap bağlantısı gerektiren kampanyalar atlanır. Açıkken bile platform kuralları bağlantı gerektirebilir."
+  "rewardFilterDescription": {
+    "message": "Lurkloot $1 üzerinde neyi farmlar. Sıra'daki filtre menüsü aynı ayarı değiştirir."
   },
-  "farmSubscriptionTitle": {
-    "message": "Abonelik gerektiren kampanyaları farmla"
+  "rewardKindsTitle": {
+    "message": "Ödül türleri"
   },
-  "farmSubscriptionDescription": {
-    "message": "Kapalıyken, ödülleri kanal aboneliği gerektiren kampanyalar atlanır."
+  "rewardKindsDescription": {
+    "message": "Bir ödülün herhangi bir kısmı eşleşirse farmlanır."
+  },
+  "rewardKindItem": {
+    "message": "Oyun içi eşyalar"
+  },
+  "rewardKindBadge": {
+    "message": "Rozetler"
+  },
+  "rewardKindEmote": {
+    "message": "Emote'ler"
+  },
+  "rewardKindItemShort": {
+    "message": "Eşyalar"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Abonelik ödülleri"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Kanal aboneliği gerektiren ödüller."
+  },
+  "subscriptionModeInclude": {
+    "message": "Dahil"
+  },
+  "subscriptionModeSkip": {
+    "message": "Atla"
+  },
+  "subscriptionModeOnly": {
+    "message": "Yalnızca"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Abonelik ödülleri diğerleriyle birlikte farmlanır."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Abonelik gerektiren ödüller farmlanmaz."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Yalnızca abonelik gerektiren ödüller farmlanır."
+  },
+  "unlinkedCampaignsTitle": {
+    "message": "Hesap bağlantısı olmayan kampanyalar"
+  },
+  "unlinkedCampaignsDescription": {
+    "message": "Hesap bağlantısı gerektiren kampanyaları farmla, atla veya en son farmla. Platform kuralları ödül almadan önce yine de bağlantı isteyebilir."
+  },
+  "unlinkedModeInclude": {
+    "message": "Dahil"
+  },
+  "unlinkedModeSkip": {
+    "message": "Atla"
+  },
+  "unlinkedModeLast": {
+    "message": "En son farmla"
+  },
+  "unlinkedModeIncludeHint": {
+    "message": "Diğerleriyle birlikte farmlanır. Ödülleri almak için hesabı bağlayın."
+  },
+  "unlinkedModeSkipHint": {
+    "message": "Sabitlenmiş olsa bile hiç farmlanmaz."
+  },
+  "unlinkedModeLastHint": {
+    "message": "Yalnızca bağlı bir kampanya farmlanamadığında farmlanır. Sabitlenmiş kampanyalar ve favori oyunlar yerini korur."
+  },
+  "rewardFilterNoUnlinked": {
+    "message": "bağlantısız atla"
+  },
+  "rewardFilterUnlinkedLast": {
+    "message": "bağlantısız sonda"
+  },
+  "queueGroupUnlinked": {
+    "message": "Bağlantısız · en son farmlanır"
+  },
+  "rankReasonUnlinked": {
+    "message": "Hesap bağlı değil"
+  },
+  "queueFixFarmLast": {
+    "message": "En son farmla"
+  },
+  "rewardFilterAll": {
+    "message": "Tüm ödüller"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Tümü"
+  },
+  "rewardFilterNoSub": {
+    "message": "abonesiz"
+  },
+  "rewardFilterSubOnly": {
+    "message": "yalnız abonelik"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "yalnızca sabitlenmiş"
+  },
+  "rewardFilterReset": {
+    "message": "Tüm ödüllere sıfırla"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Yalnızca sabitlenmiş kampanyaları farmla"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "$1 üzerinde yalnızca Sıra'da sabitlediğin kampanyalar farmlanır."
   },
   "forgetExcludedTitle": {
     "message": "Gizlenen kampanyaları sıfırla"
@@ -1853,12 +1982,6 @@
   "navWatchingNow": {
     "message": "Şu anda izleniyor"
   },
-  "watchSourcePosition": {
-    "message": "$1 · $2/$3"
-  },
-  "watchSourceChangeOrder": {
-    "message": "İzleme sırasını değiştir"
-  },
   "gamesFavouritesGroup": {
     "message": "Favoriler"
   },
@@ -1963,5 +2086,17 @@
   },
   "navGroupOthers": {
     "message": "Diğer"
+  },
+  "kickLevelSummary": {
+    "message": "Kick seviyesi $1 · seviye $3 için %$2"
+  },
+  "kickLevelShort": {
+    "message": "Sv. $1"
+  },
+  "kickLevelXp": {
+    "message": "$1 / $2 XP"
+  },
+  "kickStreakDays": {
+    "message": "$1 günlük izleme serisi"
   }
 }

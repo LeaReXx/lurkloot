@@ -47,6 +47,24 @@
   "languageTurkish": {
     "message": "तुर्की"
   },
+  "languageJapanese": {
+    "message": "जापानी"
+  },
+  "languageIndonesian": {
+    "message": "इंडोनेशियाई"
+  },
+  "languagePolish": {
+    "message": "पोलिश"
+  },
+  "languageKorean": {
+    "message": "कोरियाई"
+  },
+  "languageUkrainian": {
+    "message": "यूक्रेनियाई"
+  },
+  "languageCzech": {
+    "message": "चेक"
+  },
   "settingsLanguageTitle": {
     "message": "भाषा"
   },
@@ -98,6 +116,9 @@
   "queueSkipped": {
     "message": "छोड़े गए"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 आपके रिवॉर्ड फ़िल्टर से बाहर"
+  },
   "queueActionRequired": {
     "message": "कार्रवाई आवश्यक"
   },
@@ -110,32 +131,20 @@
   "queueStrategyLabel": {
     "message": "फिर इसके अनुसार"
   },
-  "queueFarmPinnedOnly": {
-    "message": "सिर्फ़ पिन किए गए फ़ार्म करें"
-  },
   "queueUnpinAll": {
     "message": "सभी अनपिन करें ($1)"
   },
   "queueUnpin": {
     "message": "अनपिन"
   },
-  "queueFacetLabel": {
-    "message": "कैंपेन प्रकार"
-  },
-  "queueFacetAll": {
-    "message": "सभी"
-  },
-  "queueFacetDrops": {
-    "message": "ड्रॉप्स"
-  },
-  "queueFacetBadges": {
-    "message": "सब बैज"
-  },
   "queueFixInclude": {
     "message": "शामिल करें"
   },
   "queueFixPin": {
     "message": "पिन करें"
+  },
+  "queueFixFarmAll": {
+    "message": "सब फ़ार्म करें"
   },
   "queueFixGames": {
     "message": "गेम्स खोलें"
@@ -146,8 +155,8 @@
   "queueEmpty": {
     "message": "अभी यहाँ फ़ार्म करने को कुछ नहीं है।"
   },
-  "queueEmptyBadges": {
-    "message": "अभी कोई सब्सक्रिप्शन कैंपेन फ़ार्म करने योग्य नहीं है।"
+  "queueEmptyRewardTypes": {
+    "message": "अभी चुने गए प्रकारों में से कुछ भी फ़ार्म करने योग्य नहीं है।"
   },
   "completedTabFinished": {
     "message": "पूरे हुए"
@@ -370,6 +379,18 @@
   },
   "subscriptionProgressUnknown": {
     "message": "प्रगति उपलब्ध नहीं है"
+  },
+  "rewardBadge": {
+    "message": "बैज"
+  },
+  "rewardBadgeNamed": {
+    "message": "बैज: $1"
+  },
+  "rewardAlsoWatch": {
+    "message": "साथ में $1 देखना"
+  },
+  "rewardClaimable": {
+    "message": "क्लेम के लिए तैयार"
   },
   "notEarnableByWatching": {
     "message": "देखकर अर्जित नहीं किया जा सकता"
@@ -741,13 +762,10 @@
     "message": "इस कैंपेन के सभी रिवॉर्ड पूरे हो चुके हैं।"
   },
   "campaignRejectionUnlinkedDisabled": {
-    "message": "लिंक किए खाते के बिना कैंपेन फ़ार्मिंग बंद है।"
+    "message": "बिना लिंक किए खाते वाले कैंपेन छोड़ने पर सेट हैं।"
   },
   "campaignRejectionTwitchLinkRequired": {
     "message": "इस Twitch कैंपेन के लिए खाता लिंक करना आवश्यक है।"
-  },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "सब्सक्रिप्शन कैंपेन फ़ार्मिंग बंद है।"
   },
   "campaignRejectionCategoryFiltered": {
     "message": "यह कैंपेन चुनी गई कैटेगरी से मेल नहीं खाता।"
@@ -757,6 +775,18 @@
   },
   "campaignRejectionNotPinned": {
     "message": "अभी सिर्फ़ पिन किए गए कैंपेन फ़ार्म होते हैं।"
+  },
+  "campaignRejectionRewardKind": {
+    "message": "यहाँ आपके चुने रिवॉर्ड प्रकार ($1) से कुछ भी मेल नहीं खाता।"
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "इसके रिवॉर्ड के लिए सदस्यता चाहिए, और आपने वे छोड़ने के लिए चुने हैं।"
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "इसमें कोई सदस्यता रिवॉर्ड नहीं है, और आप केवल वही फ़ार्म कर रहे हैं।"
+  },
+  "campaignRejectionRewardTypesObtained": {
+    "message": "आपके फ़ार्म किए जाने वाले प्रकारों के इसके इनाम मिल चुके हैं।"
   },
   "campaignRejectionNoRewards": {
     "message": "इस कैंपेन में फ़ार्म करने योग्य रिवॉर्ड नहीं हैं।"
@@ -902,17 +932,116 @@
   "activityLogLevelsDescription": {
     "message": "गतिविधि लॉग में कौन से स्तर रिकॉर्ड हों चुनें। त्रुटियाँ हमेशा रखी जाती हैं।"
   },
-  "farmUnlinkedTitle": {
-    "message": "बिना लिंक किए गए खाते वाले कैंपेन फ़ार्म करें"
+  "rewardFilterTitle": {
+    "message": "फ़ार्म करने वाले रिवॉर्ड"
   },
-  "farmUnlinkedDescription": {
-    "message": "बंद होने पर, खाता लिंक करने वाले कैंपेन छोड़ दिए जाते हैं। चालू होने पर भी प्लेटफ़ॉर्म के नियम लिंक करना आवश्यक बना सकते हैं।"
+  "rewardFilterDescription": {
+    "message": "$1 पर Lurkloot किन रिवॉर्ड को फ़ार्म करता है। क़तार के फ़िल्टर मेनू में भी यही सेटिंग बदलती है।"
   },
-  "farmSubscriptionTitle": {
-    "message": "सब्सक्रिप्शन वाले कैंपेन फ़ार्म करें"
+  "rewardKindsTitle": {
+    "message": "रिवॉर्ड के प्रकार"
   },
-  "farmSubscriptionDescription": {
-    "message": "बंद होने पर, जिन कैंपेन के इनाम के लिए चैनल सब्सक्रिप्शन ज़रूरी है, उन्हें छोड़ दिया जाता है।"
+  "rewardKindsDescription": {
+    "message": "रिवॉर्ड का कोई भी हिस्सा मेल खाए, तो वह फ़ार्म किया जाता है।"
+  },
+  "rewardKindItem": {
+    "message": "इन-गेम आइटम"
+  },
+  "rewardKindBadge": {
+    "message": "बैज"
+  },
+  "rewardKindEmote": {
+    "message": "इमोट"
+  },
+  "rewardKindItemShort": {
+    "message": "आइटम"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "सदस्यता रिवॉर्ड"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "वे रिवॉर्ड जिनके लिए चैनल की सदस्यता चाहिए।"
+  },
+  "subscriptionModeInclude": {
+    "message": "शामिल"
+  },
+  "subscriptionModeSkip": {
+    "message": "छोड़ें"
+  },
+  "subscriptionModeOnly": {
+    "message": "केवल"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "सदस्यता वाले रिवॉर्ड बाकी रिवॉर्ड के साथ फ़ार्म किए जाते हैं।"
+  },
+  "subscriptionModeSkipHint": {
+    "message": "जिन रिवॉर्ड के लिए सदस्यता चाहिए, वे फ़ार्म नहीं किए जाते।"
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "केवल वे रिवॉर्ड फ़ार्म किए जाते हैं जिनके लिए सदस्यता चाहिए।"
+  },
+  "unlinkedCampaignsTitle": {
+    "message": "बिना लिंक किए खाते वाले कैंपेन"
+  },
+  "unlinkedCampaignsDescription": {
+    "message": "जिन कैंपेन के लिए आपको गेम खाता लिंक करना होता है, उन्हें फ़ार्म करें, छोड़ें या सबसे आख़िर में फ़ार्म करें। पुरस्कार का दावा करने से पहले प्लेटफ़ॉर्म की शर्तों के तहत लिंक करना अब भी ज़रूरी हो सकता है।"
+  },
+  "unlinkedModeInclude": {
+    "message": "शामिल"
+  },
+  "unlinkedModeSkip": {
+    "message": "छोड़ें"
+  },
+  "unlinkedModeLast": {
+    "message": "आख़िर में फ़ार्म"
+  },
+  "unlinkedModeIncludeHint": {
+    "message": "बाकी के साथ फ़ार्म किए जाते हैं। उनके रिवॉर्ड पाने के लिए खाता लिंक करें।"
+  },
+  "unlinkedModeSkipHint": {
+    "message": "पिन होने पर भी कभी फ़ार्म नहीं किए जाते।"
+  },
+  "unlinkedModeLastHint": {
+    "message": "केवल तभी फ़ार्म किए जाते हैं जब कोई लिंक्ड कैंपेन फ़ार्म न हो सके। पिन किए गए कैंपेन और पसंदीदा गेम अपनी जगह बनाए रखते हैं।"
+  },
+  "rewardFilterNoUnlinked": {
+    "message": "बिना लिंक छोड़ें"
+  },
+  "rewardFilterUnlinkedLast": {
+    "message": "बिना लिंक सबसे बाद"
+  },
+  "queueGroupUnlinked": {
+    "message": "बिना लिंक · आख़िर में फ़ार्म"
+  },
+  "rankReasonUnlinked": {
+    "message": "खाता लिंक नहीं है"
+  },
+  "queueFixFarmLast": {
+    "message": "आख़िर में फ़ार्म"
+  },
+  "rewardFilterAll": {
+    "message": "सभी रिवॉर्ड"
+  },
+  "rewardFilterAllKinds": {
+    "message": "सभी"
+  },
+  "rewardFilterNoSub": {
+    "message": "बिना सदस्यता"
+  },
+  "rewardFilterSubOnly": {
+    "message": "केवल सदस्यता"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "केवल पिन किए गए"
+  },
+  "rewardFilterReset": {
+    "message": "सभी रिवॉर्ड पर वापस जाएँ"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "केवल पिन किए गए कैंपेन फ़ार्म करें"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "$1 पर केवल वे कैंपेन फ़ार्म होंगे जो आपने क़तार में पिन किए हैं।"
   },
   "forgetExcludedTitle": {
     "message": "हटाए गए कैंपेन भूलें"
@@ -1853,12 +1982,6 @@
   "navWatchingNow": {
     "message": "अभी देखा जा रहा है"
   },
-  "watchSourcePosition": {
-    "message": "$1 · $3 में से $2"
-  },
-  "watchSourceChangeOrder": {
-    "message": "देखने का क्रम बदलें"
-  },
   "gamesFavouritesGroup": {
     "message": "पसंदीदा"
   },
@@ -1963,5 +2086,17 @@
   },
   "navGroupOthers": {
     "message": "अन्य"
+  },
+  "kickLevelSummary": {
+    "message": "Kick लेवल $1 · लेवल $3 तक $2%"
+  },
+  "kickLevelShort": {
+    "message": "Lv $1"
+  },
+  "kickLevelXp": {
+    "message": "$1 / $2 XP"
+  },
+  "kickStreakDays": {
+    "message": "$1 दिन की देखने की स्ट्रीक"
   }
 }

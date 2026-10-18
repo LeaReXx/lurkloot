@@ -50,6 +50,18 @@ describe("parseCliSettings", () => {
 
   it("defaults preferKnownChannels to on and honors an explicit override", () => {
     expect(DEFAULT_CLI_SETTINGS.preferKnownChannels).toBe(true);
+    expect(parseCliSettings({}).platform.twitch.rewardFilter).toEqual({
+      kinds: ["item", "badge", "emote"],
+      subscriptions: "include",
+    });
+    const badgesOnly = { kinds: ["badge"], subscriptions: "skip" };
+    const typed = parseCliSettings({
+      platform: { twitch: { rewardFilter: badgesOnly }, kick: { rewardFilter: badgesOnly } },
+    });
+    expect(typed.platform.twitch.rewardFilter).toEqual(badgesOnly);
+    // Kick reports no badges, so its kinds fall back to every kind it has.
+    expect(typed.platform.kick.rewardFilter).toEqual({ kinds: ["item"], subscriptions: "skip" });
+    expect(toEngineSettings(typed).platform.twitch.rewardFilter).toEqual(badgesOnly);
     expect(parseCliSettings({}).preferKnownChannels).toBe(true);
     expect(parseCliSettings({ preferKnownChannels: false }).preferKnownChannels).toBe(false);
     expect(
@@ -213,18 +225,67 @@ describe("parseCliSettings", () => {
     },
   );
 
-  it("accepts farmingEligibility now that it gates farming", () => {
+  it("accepts the per-platform eligibility switches", () => {
     const result = parseCliSettingsWithDiagnostics({
-      farmingEligibility: { farmUnlinkedCampaigns: false },
+      platform: { kick: { unlinkedCampaigns: "last", farmPinnedOnly: true } },
     });
 
-    expect(result.settings.farmingEligibility.farmUnlinkedCampaigns).toBe(false);
-    // Unnamed keys keep their shared defaults.
-    expect(result.settings.farmingEligibility.farmSubscriptionCampaigns).toBe(
-      DEFAULT_CLI_SETTINGS.farmingEligibility.farmSubscriptionCampaigns,
-    );
+    expect(result.settings.platform.kick.unlinkedCampaigns).toBe("last");
+    expect(result.settings.platform.kick.farmPinnedOnly).toBe(true);
+    // The other platform keeps the shared defaults.
+    expect(result.settings.platform.twitch.unlinkedCampaigns).toBe("include");
+    expect(result.settings.platform.twitch.farmPinnedOnly).toBe(false);
     expect(result.diagnostics).toEqual([]);
-    expect(toEngineSettings(result.settings).farmingEligibility.farmUnlinkedCampaigns).toBe(false);
+    expect(toEngineSettings(result.settings).platform.kick.unlinkedCampaigns).toBe("last");
+  });
+
+  it("loads the old per-platform farmUnlinkedCampaigns boolean with a warning", () => {
+    const result = parseCliSettingsWithDiagnostics({
+      platform: { twitch: { farmUnlinkedCampaigns: true }, kick: { farmUnlinkedCampaigns: false } },
+    });
+
+    expect(result.settings.platform.twitch.unlinkedCampaigns).toBe("include");
+    expect(result.settings.platform.kick.unlinkedCampaigns).toBe("skip");
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "moved_property",
+        path: "platform.twitch.farmUnlinkedCampaigns",
+      }),
+      expect.objectContaining({
+        code: "moved_property",
+        path: "platform.kick.farmUnlinkedCampaigns",
+      }),
+    ]);
+  });
+
+  it("loads a top-level farmPinnedOnly with one warning, pinning both platforms", () => {
+    const result = parseCliSettingsWithDiagnostics({ farmPinnedOnly: true });
+
+    expect(result.settings).not.toHaveProperty("farmPinnedOnly");
+    expect(result.settings.platform.twitch.farmPinnedOnly).toBe(true);
+    expect(result.settings.platform.kick.farmPinnedOnly).toBe(true);
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ code: "moved_property", path: "farmPinnedOnly" }),
+    ]);
+  });
+
+  it("loads a legacy farmingEligibility block as per-platform settings", () => {
+    const result = parseCliSettingsWithDiagnostics({
+      farmingEligibility: { farmUnlinkedCampaigns: false, farmSubscriptionCampaigns: false },
+    });
+
+    expect(result.settings).not.toHaveProperty("farmingEligibility");
+    for (const platform of ["twitch", "kick"] as const) {
+      expect(result.settings.platform[platform].unlinkedCampaigns).toBe("skip");
+      expect(result.settings.platform[platform].rewardFilter.subscriptions).toBe("skip");
+    }
+    // v8 spreads the switch to both platforms; v9 then turns each into a mode.
+    expect(result.diagnostics.map((entry) => entry.path)).toEqual([
+      "farmingEligibility.farmUnlinkedCampaigns",
+      "farmingEligibility.farmSubscriptionCampaigns",
+      "platform.twitch.farmUnlinkedCampaigns",
+      "platform.kick.farmUnlinkedCampaigns",
+    ]);
   });
 
   it("migrates away a stored dropsListFilter instead of rejecting it", () => {
@@ -246,29 +307,31 @@ describe("parseCliSettings", () => {
       campaignVisibility: { notLinked: false, upcoming: false },
     });
     expect(settings).not.toHaveProperty("dropsListFilter");
-    expect(settings.farmingEligibility).toEqual({
-      farmUnlinkedCampaigns: true,
-      farmSubscriptionCampaigns: true,
-    });
+    for (const platform of ["twitch", "kick"] as const) {
+      expect(settings.platform[platform].unlinkedCampaigns).toBe("include");
+      expect(settings.platform[platform].rewardFilter.subscriptions).toBe("include");
+    }
   });
 
-  it("hard-errors on unknown farmingEligibility keys", () => {
-    expect(() => parseCliSettings({ farmingEligibility: { nonsense: true } })).toThrow(
-      /unknown setting "nonsense" under farmingEligibility/,
-    );
-  });
-
-  it("hard-errors on non-boolean farmingEligibility values", () => {
+  it("hard-errors on invalid per-platform eligibility values", () => {
     // Without this the value is dropped and the default silently farms the
     // wrong set of campaigns.
+    expect(() => parseCliSettings({ platform: { kick: { unlinkedCampaigns: "first" } } })).toThrow(
+      /"platform.kick.unlinkedCampaigns" must be one of: include, skip, last/,
+    );
+    expect(() =>
+      parseCliSettings({ platform: { kick: { farmUnlinkedCampaigns: "yes" } } }),
+    ).toThrow(
+      /"platform.kick.farmUnlinkedCampaigns" \(now "platform.kick.unlinkedCampaigns"\) must be one of/,
+    );
+    expect(() => parseCliSettings({ platform: { twitch: { farmPinnedOnly: null } } })).toThrow(
+      /"platform.twitch.farmPinnedOnly" must be a boolean/,
+    );
+    // A legacy value is carried across by the migration and judged the same way.
     expect(() =>
       parseCliSettings({ farmingEligibility: { farmUnlinkedCampaigns: "yes" } }),
-    ).toThrow(/"farmingEligibility.farmUnlinkedCampaigns" must be a boolean/);
-    expect(() =>
-      parseCliSettings({ farmingEligibility: { farmSubscriptionCampaigns: null } }),
-    ).toThrow(/"farmingEligibility.farmSubscriptionCampaigns" must be a boolean/);
-    expect(() => parseCliSettings({ farmingEligibility: [] })).toThrow(
-      /"farmingEligibility" must be a JSON object/,
+    ).toThrow(
+      /"platform.twitch.farmUnlinkedCampaigns" \(now "platform.twitch.unlinkedCampaigns"\)/,
     );
   });
 
@@ -459,6 +522,50 @@ describe("category modes", () => {
     expect(() => parseCliSettings({ platform: { kick: { categoryMode: false } } })).toThrow(
       /platform\.kick\.categoryMode/,
     );
+  });
+
+  describe("rewardFilter", () => {
+    const parseFilter = (rewardFilter: unknown, platform: "twitch" | "kick" = "twitch") =>
+      parseCliSettings({ platform: { [platform]: { rewardFilter } } });
+
+    it("rejects a typo'd subscription mode", () => {
+      expect(() => parseFilter({ subscriptions: "skpi" })).toThrow(
+        /platform\.twitch\.rewardFilter\.subscriptions/,
+      );
+    });
+
+    it("rejects an unknown kind", () => {
+      expect(() => parseFilter({ kinds: ["item", "banner"] })).toThrow(
+        /platform\.twitch\.rewardFilter\.kinds/,
+      );
+      expect(() => parseFilter({ kinds: "item" })).toThrow(/rewardFilter\.kinds/);
+    });
+
+    it("rejects a non-object filter", () => {
+      expect(() => parseFilter("badge")).toThrow(/platform\.twitch\.rewardFilter/);
+      expect(() => parseFilter(["item"])).toThrow(/platform\.twitch\.rewardFilter/);
+      expect(() => parseFilter(null)).toThrow(/platform\.twitch\.rewardFilter/);
+    });
+
+    it("rejects an unknown nested key", () => {
+      expect(() => parseFilter({ kind: ["item"] })).toThrow(/unknown setting "kind"/);
+    });
+
+    it("accepts an empty kinds list and widens it to every supported kind", () => {
+      expect(parseFilter({ kinds: [] }).platform.twitch.rewardFilter.kinds).toEqual([
+        "item",
+        "badge",
+        "emote",
+      ]);
+    });
+
+    it("accepts a kind the platform does not support and drops it", () => {
+      const settings = parseFilter({ kinds: ["item", "badge"], subscriptions: "skip" }, "kick");
+      expect(settings.platform.kick.rewardFilter).toEqual({
+        kinds: ["item"],
+        subscriptions: "skip",
+      });
+    });
   });
 
   it("migrates the legacy farmAllCategories boolean through the shared migration path", () => {

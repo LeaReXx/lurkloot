@@ -47,6 +47,24 @@
   "languageTurkish": {
     "message": "Turc"
   },
+  "languageJapanese": {
+    "message": "Japonais"
+  },
+  "languageIndonesian": {
+    "message": "Indonésien"
+  },
+  "languagePolish": {
+    "message": "Polonais"
+  },
+  "languageKorean": {
+    "message": "Coréen"
+  },
+  "languageUkrainian": {
+    "message": "Ukrainien"
+  },
+  "languageCzech": {
+    "message": "Tchèque"
+  },
   "settingsLanguageTitle": {
     "message": "Langue"
   },
@@ -98,6 +116,9 @@
   "queueSkipped": {
     "message": "Ignorées"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 hors de votre filtre de récompenses"
+  },
   "queueActionRequired": {
     "message": "Action requise"
   },
@@ -110,32 +131,20 @@
   "queueStrategyLabel": {
     "message": "Ensuite par"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farmer seulement les épinglées"
-  },
   "queueUnpinAll": {
     "message": "Tout désépingler ($1)"
   },
   "queueUnpin": {
     "message": "Désépingler"
   },
-  "queueFacetLabel": {
-    "message": "Type de campagne"
-  },
-  "queueFacetAll": {
-    "message": "Toutes"
-  },
-  "queueFacetDrops": {
-    "message": "Drops"
-  },
-  "queueFacetBadges": {
-    "message": "Badges d'abonné"
-  },
   "queueFixInclude": {
     "message": "Inclure"
   },
   "queueFixPin": {
     "message": "Épingler"
+  },
+  "queueFixFarmAll": {
+    "message": "Tout farmer"
   },
   "queueFixGames": {
     "message": "Ouvrir Jeux"
@@ -146,8 +155,8 @@
   "queueEmpty": {
     "message": "Rien à farmer pour l'instant."
   },
-  "queueEmptyBadges": {
-    "message": "Aucune campagne d'abonnement n'est farmable pour l'instant."
+  "queueEmptyRewardTypes": {
+    "message": "Rien des types sélectionnés n'est farmable pour le moment."
   },
   "completedTabFinished": {
     "message": "Terminées"
@@ -370,6 +379,18 @@
   },
   "subscriptionProgressUnknown": {
     "message": "Progression indisponible"
+  },
+  "rewardBadge": {
+    "message": "Badge"
+  },
+  "rewardBadgeNamed": {
+    "message": "Badge : $1"
+  },
+  "rewardAlsoWatch": {
+    "message": "Et $1 de visionnage"
+  },
+  "rewardClaimable": {
+    "message": "Prêt à réclamer"
   },
   "notEarnableByWatching": {
     "message": "Impossible à obtenir en regardant"
@@ -741,13 +762,10 @@
     "message": "Toutes les récompenses de cette campagne sont terminées."
   },
   "campaignRejectionUnlinkedDisabled": {
-    "message": "Le farming des campagnes sans compte lié est désactivé."
+    "message": "Les campagnes sans compte lié sont réglées sur Ignorer."
   },
   "campaignRejectionTwitchLinkRequired": {
     "message": "Cette campagne Twitch nécessite de lier un compte."
-  },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Le farming des campagnes d'abonnement est désactivé."
   },
   "campaignRejectionCategoryFiltered": {
     "message": "Cette campagne ne correspond pas aux catégories sélectionnées."
@@ -757,6 +775,18 @@
   },
   "campaignRejectionNotPinned": {
     "message": "Seules les campagnes épinglées sont farmées pour l'instant."
+  },
+  "campaignRejectionRewardKind": {
+    "message": "Rien ici ne correspond à vos types de récompenses ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Ses récompenses nécessitent un abonnement, et vous les ignorez."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Elle n’a aucune récompense d’abonnement, et vous ne farmez que celles-ci."
+  },
+  "campaignRejectionRewardTypesObtained": {
+    "message": "Ses récompenses des types que tu farmes sont obtenues."
   },
   "campaignRejectionNoRewards": {
     "message": "Cette campagne n'a aucune récompense à farmer."
@@ -902,17 +932,116 @@
   "activityLogLevelsDescription": {
     "message": "Choisissez les niveaux enregistrés dans le journal d’activité. Les erreurs sont toujours conservées."
   },
-  "farmUnlinkedTitle": {
-    "message": "Farmer les campagnes sans compte lié"
+  "rewardFilterTitle": {
+    "message": "Récompenses à farmer"
   },
-  "farmUnlinkedDescription": {
-    "message": "Si désactivé, les campagnes nécessitant de lier votre compte sont ignorées. La plateforme peut toujours imposer la liaison lorsque l'option est activée."
+  "rewardFilterDescription": {
+    "message": "Ce que Lurkloot farme sur $1. Le menu de filtre dans la File modifie le même réglage."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farmer les campagnes nécessitant un abonnement"
+  "rewardKindsTitle": {
+    "message": "Types de récompenses"
   },
-  "farmSubscriptionDescription": {
-    "message": "Si désactivé, les campagnes dont les récompenses nécessitent un abonnement à la chaîne sont ignorées."
+  "rewardKindsDescription": {
+    "message": "Une récompense est farmée si une partie quelconque correspond."
+  },
+  "rewardKindItem": {
+    "message": "Objets en jeu"
+  },
+  "rewardKindBadge": {
+    "message": "Badges"
+  },
+  "rewardKindEmote": {
+    "message": "Émotes"
+  },
+  "rewardKindItemShort": {
+    "message": "Objets"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Récompenses d’abonnement"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Récompenses qui nécessitent un abonnement à la chaîne."
+  },
+  "subscriptionModeInclude": {
+    "message": "Inclure"
+  },
+  "subscriptionModeSkip": {
+    "message": "Ignorer"
+  },
+  "subscriptionModeOnly": {
+    "message": "Uniquement"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Les récompenses d’abonnement sont farmées avec les autres."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Les récompenses qui nécessitent un abonnement ne sont pas farmées."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Seules les récompenses qui nécessitent un abonnement sont farmées."
+  },
+  "unlinkedCampaignsTitle": {
+    "message": "Campagnes sans compte lié"
+  },
+  "unlinkedCampaignsDescription": {
+    "message": "Choisissez d’inclure, d’ignorer ou de farmer en dernier les campagnes qui nécessitent de lier votre compte de jeu. Les exigences de la plateforme peuvent toujours imposer la liaison avant de réclamer une récompense."
+  },
+  "unlinkedModeInclude": {
+    "message": "Inclure"
+  },
+  "unlinkedModeSkip": {
+    "message": "Ignorer"
+  },
+  "unlinkedModeLast": {
+    "message": "Farmer en dernier"
+  },
+  "unlinkedModeIncludeHint": {
+    "message": "Farmée avec les autres. Liez le compte pour réclamer leurs récompenses."
+  },
+  "unlinkedModeSkipHint": {
+    "message": "Jamais farmée, même épinglée."
+  },
+  "unlinkedModeLastHint": {
+    "message": "Farmée seulement lorsqu’aucune campagne liée ne peut l’être. Les campagnes épinglées et les jeux favoris gardent leur place."
+  },
+  "rewardFilterNoUnlinked": {
+    "message": "ignorer non liées"
+  },
+  "rewardFilterUnlinkedLast": {
+    "message": "non liées en dernier"
+  },
+  "queueGroupUnlinked": {
+    "message": "Non liées · farmées en dernier"
+  },
+  "rankReasonUnlinked": {
+    "message": "Compte non lié"
+  },
+  "queueFixFarmLast": {
+    "message": "Farmer en dernier"
+  },
+  "rewardFilterAll": {
+    "message": "Toutes les récompenses"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Tous"
+  },
+  "rewardFilterNoSub": {
+    "message": "sans abo"
+  },
+  "rewardFilterSubOnly": {
+    "message": "abo uniquement"
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "épinglées seulement"
+  },
+  "rewardFilterReset": {
+    "message": "Réinitialiser toutes les récompenses"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farmer uniquement les campagnes épinglées"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Seules les campagnes épinglées dans la File sont farmées sur $1."
   },
   "forgetExcludedTitle": {
     "message": "Oublier les campagnes exclues"
@@ -1853,12 +1982,6 @@
   "navWatchingNow": {
     "message": "Regardée en ce moment"
   },
-  "watchSourcePosition": {
-    "message": "$1 · $2 sur $3"
-  },
-  "watchSourceChangeOrder": {
-    "message": "Modifier l’ordre de visionnage"
-  },
   "gamesFavouritesGroup": {
     "message": "Favoris"
   },
@@ -1963,5 +2086,17 @@
   },
   "navGroupOthers": {
     "message": "Autres"
+  },
+  "kickLevelSummary": {
+    "message": "Niveau Kick $1 · $2 % vers le niveau $3"
+  },
+  "kickLevelShort": {
+    "message": "Niv. $1"
+  },
+  "kickLevelXp": {
+    "message": "$1 / $2 XP"
+  },
+  "kickStreakDays": {
+    "message": "Série de $1 jours de visionnage"
   }
 }

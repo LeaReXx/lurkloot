@@ -37,20 +37,32 @@ warning per command; use the global `--log debug|info|warn|error` option instead
 option is its sole event filter.
 
 Supported `settings` keys: `autoClaim`, `autoClaimChannelPoints`, `priorityMode`,
-`campaignPins`, `farmPinnedOnly`, `excludedCampaignIds`,
+`campaignPins`, `excludedCampaignIds`,
 `preferKnownChannels`, `offlineRetryLimit`, `pollIntervalMinutes`,
-`notifyRewardEarned`, `notifyNoDropsLeft`, `farmingEligibility`, and per-platform
-`enabled`, `watchSourcePriority`, `idleWatchlistChannels`, `excludedChannels`, `categoryMode`,
+`notifyRewardEarned`, `notifyNoDropsLeft`, and per-platform
+`enabled`, `watchSourcePriority`, `idleWatchlistChannels`, `excludedChannels`, `categoryMode`, `rewardFilter`,
+`farmPinnedOnly`, `unlinkedCampaigns`,
 `categories`, `favouriteCategories`, `blockedCategories`.
 
 Campaign order has three layers, and only the last one is automatic:
 `campaignPins` lists campaign ids to farm first, in that order; then campaigns
 whose category is in that platform's `favouriteCategories`, in star order; then
 everything else by `priorityMode` (`ending_soonest` or `lowest_availability`).
-`farmPinnedOnly` narrows what may be farmed to the pinned campaigns and is
-eligibility, not order — a strategy is always in effect. A config still using
-the old `campaignPriorities` map or `priorityMode: "priority_list_only"` is
-migrated automatically, with a deprecation warning naming each moved key.
+With a platform's `unlinkedCampaigns` set to `"last"`, its unlinked campaigns
+that are neither pinned nor in a favourite category come after all of these,
+in the same `priorityMode` order.
+Each platform's `farmPinnedOnly` narrows what may be farmed to the pinned
+campaigns and is eligibility, not order — a strategy is always in effect. Each
+platform's `rewardFilter` is `{ "kinds": [...], "subscriptions": "..." }`.
+`kinds` lists the reward kinds to farm: any of `item`, `badge` and `emote` on
+Twitch, only `item` on Kick, combined as any-of; `[]` farms every kind.
+`subscriptions` is `include` (the default), `skip` to leave out rewards that
+need a channel subscription, or `only` to farm just those. Only matching
+rewards (and what they wait on) are farmed, and a campaign is left once those
+are earned. A config still using the old `campaignPriorities` map,
+`priorityMode: "priority_list_only"`, global `farmPinnedOnly`, `farmRewardTypes`
+or `farmingEligibility` is migrated automatically, with a deprecation warning
+naming each moved key.
 
 `watchSourcePriority` selects the first eligible watch source independently for
 each platform. Twitch defaults to `["drops", "nopixel", "fortnite", "idle_watchlist"]`;
@@ -85,14 +97,12 @@ eight live Drops-enabled channels per game. Add games you care about to
 visible on those live channels; offline and unscanned campaigns remain unknown.
 Inventory is still authoritative for started campaigns and reward progress.
 
-`farmingEligibility` gates what the engine may farm. Its two keys both default
-`true`: set `farmUnlinkedCampaigns` to `false` to skip campaigns that need an
-account link, and `farmSubscriptionCampaigns` to `false` to skip campaigns that
-require a channel subscription; when every discovered campaign is filtered out,
-the run logs a warning saying so. A config still using the old name
-`campaignVisibility` is migrated automatically (its farming half becomes
-`farmingEligibility`), with one deprecation warning per command, rather than
-rejected.
+Per platform, `unlinkedCampaigns` defaults to `"include"`: `"skip"` never
+farms campaigns that need an account link, and `"last"` farms them only once no
+linked campaign can be farmed. The old `farmUnlinkedCampaigns` boolean still
+loads, with a warning: `true` becomes `"include"` and `false` becomes `"skip"`. Skipping subscription campaigns is
+`rewardFilter.subscriptions: "skip"`. When every discovered campaign is
+filtered out, the run logs a warning saying so.
 
 Rejected (extension-only, no effect headlessly): `running`, `muteFarmingTabs`, `keepFarmingVideosUnmuted`, `pauseOnManualWatch`,
 `adFocusMode`, `autoCloseFinishedDrops`, `autoStartDropFarming`,

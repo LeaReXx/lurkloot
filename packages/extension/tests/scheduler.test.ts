@@ -10,8 +10,10 @@ import type {
   TwitchPlatformSettings,
 } from "@lurkloot/shared/models";
 import { DEFAULT_SETTINGS } from "@lurkloot/shared/settings";
+import type { EngineEvent } from "@lurkloot/shared/events";
 import { NO_CATEGORY_ID } from "@lurkloot/shared/categories";
 import {
+  campaignSearchFingerprint,
   chooseCampaignDecision,
   selectWatchTargetFromSnapshot,
   type StopPageContextTabs,
@@ -776,7 +778,7 @@ describe("scheduler campaign selection", () => {
     const decision = await chooseCampaignDecision(
       "twitch",
       [campaign("unlisted", { gameName: "Unlisted Game" })],
-      settings({ farmPinnedOnly: true }),
+      settings({ platform: { twitch: { farmPinnedOnly: true } } }),
       {
         listCandidateChannels,
         checkChannel: vi.fn(async (candidate) => ({
@@ -801,9 +803,9 @@ describe("scheduler campaign selection", () => {
       "twitch",
       [campaign("listed", { gameName: "Listed Game" })],
       settings({
-        farmPinnedOnly: true,
         platform: {
           twitch: {
+            farmPinnedOnly: true,
             categoryMode: "include",
             categories: [{ id: "listed game", name: "Listed Game" }],
           },
@@ -827,7 +829,7 @@ describe("scheduler campaign selection", () => {
     const decision = await chooseCampaignDecision(
       "twitch",
       [campaign("pinned"), campaign("unlisted")],
-      settings({ farmPinnedOnly: true, campaignPins: ["pinned"] }),
+      settings({ campaignPins: ["pinned"], platform: { twitch: { farmPinnedOnly: true } } }),
       {
         listCandidateChannels: vi.fn(async () => [channel("creator")]),
         checkChannel: vi.fn(async (candidate) => ({
@@ -840,6 +842,131 @@ describe("scheduler campaign selection", () => {
 
     expect(decision.action).toBe("watch");
     expect(decision.campaign?.id).toBe("pinned");
+  });
+
+  it("fingerprints a campaign with its own platform's settings", () => {
+    const kick = campaign("kick-campaign", { platform: "kick" });
+    const base = settings();
+    const unlinkedOff = settings({ platform: { kick: { unlinkedCampaigns: "skip" } } });
+    const twitchChanged = settings({ platform: { twitch: { farmPinnedOnly: true } } });
+
+    expect(campaignSearchFingerprint(kick, unlinkedOff)).not.toBe(
+      campaignSearchFingerprint(kick, base),
+    );
+    expect(campaignSearchFingerprint(kick, twitchChanged)).toBe(
+      campaignSearchFingerprint(kick, base),
+    );
+  });
+
+  it("farm pinned only on Twitch leaves Kick's unpinned campaigns farmed", async () => {
+    const decision = await chooseCampaignDecision(
+      "kick",
+      [campaign("kick-unpinned", { platform: "kick" })],
+      settings({ platform: { twitch: { farmPinnedOnly: true } } }),
+      {
+        listCandidateChannels: vi.fn(async () => [channel("creator", { platform: "kick" })]),
+        checkChannel: vi.fn(async (candidate) => ({
+          live: true,
+          categoryMatches: true,
+          candidate,
+        })),
+      },
+    );
+
+    expect(decision.action).toBe("watch");
+    expect(decision.campaign?.id).toBe("kick-unpinned");
+  });
+
+  describe("rewardFilter", () => {
+    const live = {
+      listCandidateChannels: vi.fn(async () => [channel("creator")]),
+      checkChannel: vi.fn(async (candidate: ChannelCandidate) => ({
+        live: true,
+        categoryMatches: true,
+        candidate,
+      })),
+    };
+    const item = (id: string, patch: Partial<DropReward> = {}): DropReward => ({
+      ...reward("in_progress"),
+      id,
+      ...patch,
+    });
+    const badgesOnly = { kinds: ["badge" as const], subscriptions: "include" as const };
+    const badgeReward = (id: string, patch: Partial<DropReward> = {}): DropReward =>
+      item(id, { benefits: [{ id: `${id}-benefit`, distributionType: "BADGE" }], ...patch });
+
+    it("farms only badge campaigns, and only toward their badges", async () => {
+      // The item comes first and is shorter; the strategy would pick it.
+      const mixed = campaign("mixed", {
+        rewards: [item("item", { requiredMinutes: 15 }), badgeReward("badge")],
+      });
+      const decision = await chooseCampaignDecision(
+        "twitch",
+        [campaign("plain"), mixed],
+        settings({ platform: { twitch: { rewardFilter: badgesOnly } } }),
+        live,
+      );
+
+      expect(decision.action).toBe("watch");
+      expect(decision.campaign?.id).toBe("mixed");
+      expect(decision.reward?.id).toBe("badge");
+    });
+
+    it("farms a badge's prerequisite before the badge", async () => {
+      const chained = campaign("chained", {
+        rewards: [
+          item("first"),
+          badgeReward("badge", { preconditionRewardIds: ["first"], preconditionsMet: false }),
+          item("unrelated", { requiredMinutes: 5 }),
+        ],
+      });
+      const decision = await chooseCampaignDecision(
+        "twitch",
+        [chained],
+        settings({ platform: { twitch: { rewardFilter: badgesOnly } } }),
+        live,
+      );
+
+      expect(decision.reward?.id).toBe("first");
+    });
+
+    it("stops at a campaign whose badges are earned, items left or not", async () => {
+      const earned = campaign("earned", {
+        rewards: [badgeReward("badge", { status: "claimed", watchedMinutes: 60 }), item("item")],
+      });
+      const decision = await chooseCampaignDecision(
+        "twitch",
+        [earned],
+        settings({ platform: { twitch: { rewardFilter: badgesOnly } } }),
+        live,
+      );
+
+      expect(decision.action).toBe("idle");
+    });
+
+    it("leaves Kick's farming alone when Twitch farms badges", async () => {
+      const decision = await chooseCampaignDecision(
+        "kick",
+        [campaign("kick-plain", { platform: "kick" })],
+        settings({ platform: { twitch: { rewardFilter: badgesOnly } } }),
+        live,
+      );
+
+      expect(decision.action).toBe("watch");
+      expect(decision.campaign?.id).toBe("kick-plain");
+    });
+
+    it("says why it idles when no campaign is of the selected type", async () => {
+      const decision = await chooseCampaignDecision(
+        "twitch",
+        [campaign("plain")],
+        settings({ platform: { twitch: { rewardFilter: badgesOnly } } }),
+        live,
+      );
+
+      expect(decision.action).toBe("idle");
+      expect(decision.reason).toContain("No campaigns have rewards your reward filter allows");
+    });
   });
 
   it("prefers an Idle Watchlist channel over a bigger directory channel", async () => {
@@ -1561,13 +1688,6 @@ describe("scheduler campaign selection", () => {
 });
 
 describe("campaign filters gate farming", () => {
-  const eligibility = (
-    patch: Partial<ExtensionSettings["farmingEligibility"]>,
-  ): ExtensionSettings["farmingEligibility"] => ({
-    ...DEFAULT_SETTINGS.farmingEligibility,
-    ...patch,
-  });
-
   const kickAdapter = () => ({
     listCandidateChannels: vi.fn(async () => [channel("creator", { platform: "kick" as const })]),
     checkChannel: vi.fn(async (candidate: ChannelCandidate) => ({
@@ -1579,11 +1699,11 @@ describe("campaign filters gate farming", () => {
 
   const unlinkedKick = () => campaign("unlinked", { platform: "kick", accountLinked: false });
 
-  it("skips an unlinked Kick campaign when farmUnlinkedCampaigns is off", async () => {
+  it("skips an unlinked Kick campaign when unlinked campaigns are skipped", async () => {
     const decision = await chooseCampaignDecision(
       "kick",
       [unlinkedKick()],
-      settings({ farmingEligibility: eligibility({ farmUnlinkedCampaigns: false }) }),
+      settings({ platform: { kick: { unlinkedCampaigns: "skip" } } }),
       kickAdapter(),
     );
 
@@ -1591,7 +1711,7 @@ describe("campaign filters gate farming", () => {
     expect(decision.reason).toContain("farming eligibility");
   });
 
-  it("still farms an unlinked Kick campaign when farmUnlinkedCampaigns is on", async () => {
+  it("still farms an unlinked Kick campaign when unlinked campaigns are included", async () => {
     const decision = await chooseCampaignDecision(
       "kick",
       [unlinkedKick()],
@@ -1618,11 +1738,25 @@ describe("campaign filters gate farming", () => {
       ],
     });
 
-  it("skips a subscription campaign when farmSubscriptionCampaigns is off", async () => {
+  const skipSubscriptions = { kinds: ["item" as const], subscriptions: "skip" as const };
+
+  it("skips a campaign whose only reward needs a subscription under skip", async () => {
+    const subscriptionOnly = campaign("sub-only", {
+      rewards: [
+        {
+          id: "sub",
+          name: "Sub reward",
+          requiredMinutes: 0,
+          watchedMinutes: 0,
+          requiredSubs: 1,
+          status: "locked",
+        },
+      ],
+    });
     const decision = await chooseCampaignDecision(
       "twitch",
-      [subscriptionCampaign()],
-      settings({ farmingEligibility: eligibility({ farmSubscriptionCampaigns: false }) }),
+      [subscriptionOnly],
+      settings({ platform: { twitch: { rewardFilter: skipSubscriptions } } }),
       {
         listCandidateChannels: vi.fn(async () => [channel("creator")]),
         checkChannel: vi.fn(async (candidate) => ({
@@ -1634,21 +1768,33 @@ describe("campaign filters gate farming", () => {
     );
 
     expect(decision.action).toBe("idle");
-    expect(decision.reason).toContain("farming eligibility");
+    expect(decision.reason).toContain("No campaigns have rewards your reward filter allows");
   });
 
-  it("still farms a subscription campaign's watch rewards when farmSubscriptionCampaigns is on", async () => {
-    const decision = await chooseCampaignDecision("twitch", [subscriptionCampaign()], settings(), {
-      listCandidateChannels: vi.fn(async () => [channel("creator")]),
-      checkChannel: vi.fn(async (candidate) => ({ live: true, categoryMatches: true, candidate })),
-    });
+  it("still farms a mixed campaign's watch rewards, under include and under skip", async () => {
+    for (const rewardFilter of [DEFAULT_SETTINGS.platform.twitch.rewardFilter, skipSubscriptions]) {
+      const decision = await chooseCampaignDecision(
+        "twitch",
+        [subscriptionCampaign()],
+        settings({ platform: { twitch: { rewardFilter } } }),
+        {
+          listCandidateChannels: vi.fn(async () => [channel("creator")]),
+          checkChannel: vi.fn(async (candidate) => ({
+            live: true,
+            categoryMatches: true,
+            candidate,
+          })),
+        },
+      );
 
-    expect(decision.action).toBe("watch");
-    expect(decision.campaign?.id).toBe("mixed");
+      expect(decision.action).toBe("watch");
+      expect(decision.campaign?.id).toBe("mixed");
+      expect(decision.reward?.id).not.toBe("sub");
+    }
   });
 
   it("farms an ordinary active campaign under the default eligibility settings", async () => {
-    // Nothing is turned off, so the default farmingEligibility flags must be
+    // Nothing is turned off, so the default eligibility settings must be
     // behaviour-neutral for a linked, non-subscription campaign.
     const decision = await chooseCampaignDecision("twitch", [campaign("active")], settings(), {
       listCandidateChannels: vi.fn(async () => [channel("creator")]),
@@ -1972,8 +2118,10 @@ describe("scheduler tick", () => {
     ];
     const twitch = adapter("twitch", rejected, [channel("creator")]);
     const tickSettings = settings({
-      farmingEligibility: { farmUnlinkedCampaigns: false, farmSubscriptionCampaigns: true },
-      platform: { twitch: { enabled: true }, kick: { enabled: false } },
+      platform: {
+        twitch: { enabled: true, unlinkedCampaigns: "skip" },
+        kick: { enabled: false },
+      },
     });
     const tickAdapters = { twitch, kick: adapter("kick", [], []) };
     const campaignEvaluationFingerprints = {};
@@ -2791,6 +2939,128 @@ describe("scheduler tick", () => {
       channel: { username: "current" },
     });
     expect(result.state.sessions.twitch.reasonCode).not.toBe("higher_priority_reward");
+  });
+
+  describe("unlinked campaigns farmed last", () => {
+    const kickSettings = settings({
+      tablessMode: true,
+      platform: {
+        twitch: { enabled: false, idleWatchlistChannels: [] },
+        kick: { enabled: true, idleWatchlistChannels: [], unlinkedCampaigns: "last" },
+      },
+    });
+    const kickChannel = (username: string) =>
+      channel(username, { platform: "kick", url: `https://kick.com/${username}` });
+    // The unlinked campaign ends first, so any other setting would farm it first.
+    const unlinked = campaign("unlinked", {
+      platform: "kick",
+      accountLinked: false,
+      endsAt: "2099-01-01T00:00:00.000Z",
+    });
+    const linked = campaign("linked", {
+      platform: "kick",
+      endsAt: "2099-02-01T00:00:00.000Z",
+      rewards: [{ ...reward("locked"), id: "linked-reward" }],
+    });
+    const watchingUnlinked: SchedulerState = {
+      ...baseState,
+      sessions: {
+        ...baseState.sessions,
+        kick: {
+          platform: "kick",
+          status: "watching",
+          channel: kickChannel("unlinked-channel"),
+          campaignId: "unlinked",
+          rewardId: "reward-in_progress",
+          offlineChecks: 0,
+          playbackChecks: 0,
+          watchMode: "tabless",
+        },
+      },
+    };
+
+    it("farms a linked campaign before an unlinked one that ends sooner", async () => {
+      const kick = adapter("kick", [unlinked, linked], [kickChannel("live")]);
+      const decision = await chooseCampaignDecision("kick", [unlinked, linked], kickSettings, kick);
+
+      expect(decision.action).toBe("watch");
+      expect(decision.campaign?.id).toBe("linked");
+    });
+
+    it("farms the unlinked campaign when no linked one has a live channel", async () => {
+      const kick = adapter("kick", [unlinked, linked], []);
+      vi.mocked(kick.listCandidateChannels).mockImplementation(async (target) =>
+        target.id === "unlinked" ? [kickChannel("unlinked-channel")] : [],
+      );
+      const decision = await chooseCampaignDecision("kick", [unlinked, linked], kickSettings, kick);
+
+      expect(decision.action).toBe("watch");
+      expect(decision.campaign?.id).toBe("unlinked");
+    });
+
+    it("switches from an in-progress unlinked reward as soon as a linked one can be farmed", async () => {
+      const kick = adapter("kick", [unlinked, linked], [kickChannel("linked-channel")]);
+
+      const result = await runSchedulerTick(
+        watchingUnlinked,
+        kickSettings,
+        { twitch: adapter("twitch", [], []), kick },
+        { platforms: ["kick"] },
+      );
+
+      expect(result.state.sessions.kick).toMatchObject({
+        status: "watching",
+        campaignId: "linked",
+        channel: { username: "linked-channel" },
+      });
+    });
+
+    it("keeps the unlinked watch for hours while no linked campaign has a live channel", async () => {
+      const kick = adapter("kick", [unlinked, linked], []);
+      vi.mocked(kick.listCandidateChannels).mockImplementation(async (target) =>
+        target.id === "unlinked" ? [kickChannel("unlinked-channel")] : [],
+      );
+
+      let state = watchingUnlinked;
+      // Three hours of one-minute ticks: the linked campaign is looked for on
+      // every tick, and the unlinked watch is never dropped or reopened.
+      for (let tick = 0; tick < 180; tick += 1) {
+        const result = await runSchedulerTick(
+          state,
+          kickSettings,
+          { twitch: adapter("twitch", [], []), kick },
+          { platforms: ["kick"] },
+        );
+        state = result.state;
+        expect(state.sessions.kick).toMatchObject({
+          status: "watching",
+          campaignId: "unlinked",
+          channel: { username: "unlinked-channel" },
+        });
+      }
+      // The tick re-asserts the same watch each time; it never stops it or
+      // points it anywhere else.
+      expect(
+        vi
+          .mocked(kick.prepareWatchTab)
+          .mock.calls.every(([target]) => target.username === "unlinked-channel"),
+      ).toBe(true);
+      expect(kick.stopWatchTab).not.toHaveBeenCalled();
+      // The re-assertions are not new opens: churn stays at the first one.
+      expect(state.criticalHealth?.kick?.managedTabOpens.length ?? 0).toBeLessThanOrEqual(1);
+    });
+
+    it("keeps a pinned unlinked campaign ahead of linked ones", async () => {
+      const kick = adapter("kick", [unlinked, linked], [kickChannel("live")]);
+      const decision = await chooseCampaignDecision(
+        "kick",
+        [unlinked, linked],
+        { ...kickSettings, campaignPins: ["unlinked"] },
+        kick,
+      );
+
+      expect(decision.campaign?.id).toBe("unlinked");
+    });
   });
 
   it("bypasses current-watch retention when a higher-priority campaign is available", async () => {
@@ -4406,6 +4676,79 @@ describe("scheduler tick", () => {
           event.category === "diagnostic" && /claim/i.test(event.message) && event.level !== "info",
       ),
     ).toBe(false);
+  });
+
+  it("stays quiet on every tick for a claim the platform refused with link guidance", async () => {
+    const ready = campaign("linked-drops", { platform: "kick", rewards: [reward("claimable")] });
+    // Refreshed campaigns arrive as fresh objects without guidance; the
+    // adapter stamps it on each refusal, as Kick does for a suppressed claim.
+    const kick = adapter("kick", [], [channel("allowed", { platform: "kick" })]);
+    kick.refreshCampaigns = vi.fn(async () => [structuredClone(ready)]);
+    kick.claimReward = vi.fn(async (_campaign: DropCampaign, claimReward: DropReward) => {
+      claimReward.claimGuidance = { kind: "link_required", url: "https://accounts.example/link" };
+      return false;
+    });
+    const enabledSettings = settings({
+      platform: {
+        twitch: { enabled: false, idleWatchlistChannels: [] },
+        kick: { enabled: true, idleWatchlistChannels: [] },
+      },
+    });
+    let state: SchedulerState = {
+      authHealth: HEALTHY_AUTH,
+      sessions: {
+        twitch: { platform: "twitch", status: "idle", offlineChecks: 0 },
+        kick: { platform: "kick", status: "idle", offlineChecks: 0 },
+      },
+      campaigns: { twitch: [], kick: [] },
+    };
+    const events: EngineEvent[] = [];
+
+    for (let tick = 0; tick < 5; tick += 1) {
+      const result = await runSchedulerTick(state, enabledSettings, {
+        twitch: adapter("twitch", [], []),
+        kick,
+      });
+      state = result.state;
+      events.push(...result.events);
+    }
+
+    expect(kick.claimReward).toHaveBeenCalled();
+    expect(
+      events.filter(
+        (event) => event.category === "diagnostic" && event.message.startsWith("Could not claim"),
+      ),
+    ).toEqual([]);
+  });
+
+  it("still warns when a claim is refused without guidance", async () => {
+    const ready = campaign("drops", { rewards: [reward("claimable")] });
+    const twitch = adapter("twitch", [ready], [channel("allowed")]);
+    twitch.claimReward = vi.fn(async () => false);
+
+    const result = await runSchedulerTick(
+      {
+        authHealth: HEALTHY_AUTH,
+        sessions: {
+          twitch: { platform: "twitch", status: "idle", offlineChecks: 0 },
+          kick: { platform: "kick", status: "idle", offlineChecks: 0 },
+        },
+        campaigns: { twitch: [], kick: [] },
+      },
+      settings({
+        platform: {
+          twitch: { enabled: true, idleWatchlistChannels: [] },
+          kick: { enabled: false, idleWatchlistChannels: [] },
+        },
+      }),
+      { twitch, kick: adapter("kick", [], []) },
+    );
+
+    expect(
+      result.events.filter(
+        (event) => event.category === "diagnostic" && event.message.startsWith("Could not claim"),
+      ),
+    ).toHaveLength(1);
   });
 
   it("reports an unreleased claim only when it first enters the waiting state", async () => {

@@ -52,6 +52,8 @@ Follow [RELEASING.md](RELEASING.md) for the `preview` and `production` environme
 
 Diagnostic messages are always English literals — never add `diagnostic*` message keys to the locale catalogs, and never translate a diagnostic body. Only activity events (structured `code` + `data`, localized by the host UI) and OS notification copy are localized. Activity events get their English diagnostic counterpart automatically from `packages/core/src/core/activityDiagnostics.ts`, so do not hand-write a diagnostic next to an activity emit.
 
+Message catalogs (`packages/locales/messages/*.json`), Chrome Web Store descriptions (`packages/extension/store-descriptions/*.txt`), and store artwork copy (`packages/popup-ui/src/storeArtworkCopy.ts`) are token-heavy. Delegate each locale's translation to an inexpensive subagent — Haiku, Luna, or the cheapest capable model in the live catalog — and integrate what it returns. The implementing agent wires locale types, loaders, options, tests, and docs; it does not translate those bodies itself on a high-cost model (Opus, Sol, and similar). Preserve `$1` placeholders and brand names, keep "farm" as the gaming term, and do not add `diagnostic*` keys.
+
 Use strict TypeScript and ES modules. Keep imports explicit and prefer `type` imports for types. Follow the existing two-space indentation, double quotes, semicolons, and camelCase functions/variables. Use PascalCase for React components and TypeScript types. Put cross-package types, models, and settings in `@lurkloot/shared` rather than duplicating them. Keep platform behavior behind `PlatformAdapter`; do not mix Twitch/Kick parsing logic into scheduler or UI code.
 
 ## Architecture Rules
@@ -95,6 +97,25 @@ branch, and `main` runs ahead of it between releases. Leave the main checkout pa
 Run `git worktree list` before starting: if a worktree for the work already exists, use it rather
 than creating a second one. Remove a worktree with `git worktree remove .worktrees/<name>` once its
 branch is merged.
+
+### Testing a Worktree Build in the Browser
+
+The user keeps the unpacked extension loaded from the main checkout's output directory
+(`packages/extension/.output/chrome-mv3`, or `packages/extension/.output/firefox-mv2` for Firefox),
+not from each worktree. At the end of every task that changes extension behavior, ask the user
+whether they want to test it in the browser. If they do, build inside the worktree and copy the
+result into the main checkout's output directory, so they only need to reload the extension:
+
+```bash
+# from .worktrees/<name>
+pnpm build # or pnpm build:firefox
+rsync -a --delete packages/extension/.output/chrome-mv3/ "$(git rev-parse --path-format=absolute --git-common-dir)/../packages/extension/.output/chrome-mv3/"
+```
+
+Copy even when the main checkout is on a different branch or commit than the worktree. `.output/`
+is gitignored, so the copy does not touch the main checkout's HEAD or working tree. Do not check
+out, reset or build in the main checkout to do this. Keep the destination directory and replace
+only its contents, as `rsync --delete` does, so the browser's loaded path stays valid.
 
 ## Commit & Pull Request Guidelines
 

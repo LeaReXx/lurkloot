@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { AnimatePresence } from "motion/react";
 import {
   AlertTriangle,
+  Award,
   Ban,
   Check,
   ChevronDown,
@@ -19,7 +20,7 @@ import {
   Star,
   Users,
 } from "lucide-react";
-import type { CategorySelection } from "@lurkloot/shared/models";
+import type { CategorySelection, RewardFilter, RewardKind } from "@lurkloot/shared/models";
 import { I18nContext, PopupRuntimeContext, SubscriptionMarkContext, useT } from "./context";
 import {
   formatCountdown,
@@ -108,7 +109,13 @@ export type CampaignCardProps = {
   rankReason?: string;
   onToggleFavouriteCategory?(category: CategorySelection): void | Promise<void>;
   onToggleBlockedCategory?(category: CategorySelection): void | Promise<void>;
+  // The platform's reward filter, which a skipped row's reason names. Only the
+  // queue passes it: no other view shows a filter miss.
+  rewardFilter?: RewardFilter;
 };
+
+type Rejection = NonNullable<CampaignView["farmingRejection"]>;
+const NO_REWARD_FILTER: RewardFilter = { kinds: [], subscriptions: "include" };
 
 /** One campaign. Collapsed, a row: rank, name, progress, when it ends, a pin.
  * Opened, everything about it and everything that can be done to it, so no
@@ -138,6 +145,7 @@ export function CampaignCard({
   rankReason,
   onToggleFavouriteCategory,
   onToggleBlockedCategory,
+  rewardFilter = NO_REWARD_FILTER,
 }: CampaignCardProps) {
   const t = useT();
   const { locale } = React.useContext(I18nContext);
@@ -158,16 +166,13 @@ export function CampaignCard({
   const upcoming = !finished && campaign.status === "upcoming";
   const farmingRejection = isFarming || finished ? undefined : campaign.farmingRejection;
   const farmingRejectionMessage = farmingRejection
-    ? t(campaignRejectionMessageKey(farmingRejection.code), farmingRejection.rewardName)
+    ? campaignRejectionMessage(farmingRejection, rewardFilter, t, locale)
     : undefined;
   // Fixing the first reason is not always enough (#677): say what comes next,
   // so a fix that leaves the campaign skipped does not look like it failed.
   const nextBlocker = farmingRejection ? campaign.laterBlockers?.[0] : undefined;
   const nextBlockerMessage = nextBlocker
-    ? t(
-        "campaignRejectionThen",
-        t(campaignRejectionMessageKey(nextBlocker.code), nextBlocker.rewardName),
-      )
+    ? t("campaignRejectionThen", campaignRejectionMessage(nextBlocker, rewardFilter, t, locale))
     : undefined;
   const emphasized = !finished && (isFarming || (!anyFarming && index === 0 && !farmingRejection));
   const showsWatchProgress = stats.kind === "watch" || stats.kind === "mixed";
@@ -1384,31 +1389,64 @@ function RewardCarousel({
   );
 }
 
-export function campaignRejectionMessageKey(
-  code: NonNullable<CampaignView["farmingRejection"]>["code"],
+const REJECTION_KEYS: Record<Rejection["code"], string> = {
+  excluded: "campaignRejectionExcluded",
+  upcoming: "campaignRejectionUpcoming",
+  expired: "campaignRejectionExpired",
+  completed: "campaignRejectionCompleted",
+  unlinked_campaigns_disabled: "campaignRejectionUnlinkedDisabled",
+  twitch_link_required: "campaignRejectionTwitchLinkRequired",
+  category_filtered: "campaignRejectionCategoryFiltered",
+  category_blocked: "campaignRejectionCategoryBlocked",
+  not_pinned: "campaignRejectionNotPinned",
+  reward_type_filtered: "campaignRejectionRewardKind",
+  reward_types_obtained: "campaignRejectionRewardTypesObtained",
+  no_rewards: "campaignRejectionNoRewards",
+  no_unclaimed_rewards: "campaignRejectionNoUnclaimedRewards",
+  reward_prerequisites_unmet: "campaignRejectionPrerequisites",
+  reward_not_started: "campaignRejectionRewardNotStarted",
+  reward_window_ended: "campaignRejectionRewardWindowEnded",
+  insufficient_time: "campaignRejectionInsufficientTime",
+  subscription_required: "campaignRejectionSubscriptionRequired",
+  action_required: "campaignRejectionActionRequired",
+  no_farmable_reward: "campaignRejectionNoFarmableReward",
+};
+
+const REJECTION_KIND_KEYS: Record<RewardKind, string> = {
+  item: "rewardKindItem",
+  badge: "rewardKindBadge",
+  emote: "rewardKindEmote",
+};
+
+/** Why a campaign is skipped, in words. A reward-filter miss names the half of
+ * the filter that missed: the kinds the user selected, or the subscription
+ * choice. */
+export function campaignRejectionMessage(
+  rejection: Rejection,
+  filter: RewardFilter,
+  t: TFunction,
+  locale = "en",
 ): string {
-  const keys: Record<NonNullable<CampaignView["farmingRejection"]>["code"], string> = {
-    excluded: "campaignRejectionExcluded",
-    upcoming: "campaignRejectionUpcoming",
-    expired: "campaignRejectionExpired",
-    completed: "campaignRejectionCompleted",
-    unlinked_campaigns_disabled: "campaignRejectionUnlinkedDisabled",
-    twitch_link_required: "campaignRejectionTwitchLinkRequired",
-    subscription_campaigns_disabled: "campaignRejectionSubscriptionDisabled",
-    category_filtered: "campaignRejectionCategoryFiltered",
-    category_blocked: "campaignRejectionCategoryBlocked",
-    not_pinned: "campaignRejectionNotPinned",
-    no_rewards: "campaignRejectionNoRewards",
-    no_unclaimed_rewards: "campaignRejectionNoUnclaimedRewards",
-    reward_prerequisites_unmet: "campaignRejectionPrerequisites",
-    reward_not_started: "campaignRejectionRewardNotStarted",
-    reward_window_ended: "campaignRejectionRewardWindowEnded",
-    insufficient_time: "campaignRejectionInsufficientTime",
-    subscription_required: "campaignRejectionSubscriptionRequired",
-    action_required: "campaignRejectionActionRequired",
-    no_farmable_reward: "campaignRejectionNoFarmableReward",
-  };
-  return keys[code];
+  if (rejection.code === "reward_type_filtered") {
+    if (rejection.filteredBy === "subscription") {
+      return t(
+        filter.subscriptions === "only"
+          ? "campaignRejectionSubscriptionOnly"
+          : "campaignRejectionSubscriptionSkipped",
+      );
+    }
+    const labels = filter.kinds.map((kind) => t(REJECTION_KIND_KEYS[kind]));
+    return t("campaignRejectionRewardKind", formatDisjunction(labels, locale));
+  }
+  return t(REJECTION_KEYS[rejection.code], rejection.rewardName);
+}
+
+function formatDisjunction(items: string[], locale: string): string {
+  try {
+    return new Intl.ListFormat(locale, { type: "disjunction" }).format(items);
+  } catch {
+    return items.join(", ");
+  }
 }
 
 function SubscriptionMarkControl({ marked, onToggle }: { marked: boolean; onToggle(): void }) {
@@ -1450,7 +1488,15 @@ function RewardTile({
   onToggleSubscriptionMark?: (rewardId: string) => void;
 }) {
   const t = useT();
-  const done = reward.obtained || (reward.progress ?? 0) >= 100;
+  // Earned and claimable come from the platform: a subscription mark is the
+  // user's word that they subscribed, not that the reward was granted.
+  const earned = reward.status === "claimed" || reward.status === "claimable";
+  // A marked reward's watching can be done while the platform still holds it.
+  const done =
+    earned
+    || (reward.requirement === "watch"
+      && !reward.subscriptionMarked
+      && (reward.progress ?? 0) >= 100);
   // An expired campaign's unearned rewards are gone, not pending.
   const lost = missed && !reward.obtained;
   // Never on an expired campaign: marking cannot bring a reward back.
@@ -1464,6 +1510,7 @@ function RewardTile({
   return (
     <div
       data-reward-missed={lost || undefined}
+      data-reward-badge={reward.badge ? "" : undefined}
       className={cn(
         "w-[128px] shrink-0 rounded-xl border bg-white p-2 dark:bg-zinc-900",
         lost
@@ -1500,6 +1547,21 @@ function RewardTile({
             <Check size={11} strokeWidth={3} />
           </span>
         )}
+        {reward.badge ? (
+          // Names the badge in a reward that also grants something else, where
+          // the tile's name and art are the other benefit's.
+          <Tip
+            label={reward.badge.name ? t("rewardBadgeNamed", reward.badge.name) : t("rewardBadge")}
+          >
+            <span
+              data-reward-badge-chip
+              className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-white/90 px-1 py-px text-[9px] font-semibold text-zinc-700 shadow-sm dark:bg-zinc-950/85 dark:text-zinc-200"
+            >
+              <Award size={9} aria-hidden />
+              {t("rewardBadge")}
+            </span>
+          </Tip>
+        ) : null}
       </div>
       <Tip label={reward.name}>
         <div className="mb-1.5 line-clamp-1 text-[11px] font-medium text-zinc-800 dark:text-zinc-200">
@@ -1535,14 +1597,20 @@ function RewardTile({
             {t("subscriptionRequired")}
           </div>
           <div>{t("qualifyingSubscriptionsRequired", String(reward.requiredSubs ?? 1))}</div>
-          {reward.subscriptionMarked ? null : (
-            <div
-              className={cn(
-                "font-medium",
-                reward.obtained && "text-emerald-600 dark:text-emerald-400",
-              )}
-            >
-              {reward.obtained ? t("earned") : t("subscriptionProgressUnknown")}
+          {/* Twitch asks for both on some rewards: the watching is a second
+              requirement, not an alternative. */}
+          {reward.requiredMinutes > 0 ? (
+            <div data-reward-also-watch>
+              {t("rewardAlsoWatch", formatMinutes(reward.requiredMinutes))}
+            </div>
+          ) : null}
+          {reward.subscriptionMarked && !earned ? null : (
+            <div className={cn("font-medium", earned && "text-emerald-600 dark:text-emerald-400")}>
+              {reward.status === "claimed"
+                ? t("earned")
+                : reward.status === "claimable"
+                  ? t("rewardClaimable")
+                  : t("subscriptionProgressUnknown")}
             </div>
           )}
           {markControl}

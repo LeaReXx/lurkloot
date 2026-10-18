@@ -8,6 +8,7 @@ import {
   type SettingsPatch,
 } from "@lurkloot/shared/settings";
 import { migrateSettings } from "@lurkloot/shared/settingsSchema";
+import { defaultRewardFilter } from "@lurkloot/shared/rewardFilter";
 import {
   buildSettingsExportPayload,
   parseSettingsImportPayload,
@@ -179,7 +180,7 @@ describe("settings", () => {
 
   it("keeps campaign pins as an ordered, deduplicated id list", () => {
     expect(DEFAULT_SETTINGS.campaignPins).toEqual([]);
-    expect(DEFAULT_SETTINGS.farmPinnedOnly).toBe(false);
+    expect(DEFAULT_SETTINGS.platform.twitch.farmPinnedOnly).toBe(false);
     expect(
       mergeSettings({ campaignPins: [" first ", "second", "first"] } as never).campaignPins,
     ).toEqual(["first", "second"]);
@@ -369,7 +370,8 @@ describe("settings", () => {
       "lowest_availability",
     );
     // "priority_list_only" is no longer a mode; migration turns it into the
-    // farmPinnedOnly switch, and an unknown value falls back to the default.
+    // per-platform farmPinnedOnly switch, and an unknown value falls back to
+    // the default.
     expect(mergeSettings({ priorityMode: "priority_list_only" } as never).priorityMode).toBe(
       "ending_soonest",
     );
@@ -413,6 +415,12 @@ describe("settings", () => {
     expect(mergeSettings({ languageOverride: "pt_BR" }).languageOverride).toBe("pt_BR");
     expect(mergeSettings({ languageOverride: "ar" }).languageOverride).toBe("ar");
     expect(mergeSettings({ languageOverride: "tr" }).languageOverride).toBe("tr");
+    expect(mergeSettings({ languageOverride: "ja" }).languageOverride).toBe("ja");
+    expect(mergeSettings({ languageOverride: "id" }).languageOverride).toBe("id");
+    expect(mergeSettings({ languageOverride: "pl" }).languageOverride).toBe("pl");
+    expect(mergeSettings({ languageOverride: "ko" }).languageOverride).toBe("ko");
+    expect(mergeSettings({ languageOverride: "uk" }).languageOverride).toBe("uk");
+    expect(mergeSettings({ languageOverride: "cs" }).languageOverride).toBe("cs");
     expect(
       mergeSettings({ languageOverride: "pt" } as unknown as Parameters<typeof mergeSettings>[0])
         .languageOverride,
@@ -562,20 +570,37 @@ describe("per-platform claim settings", () => {
   });
 });
 
-describe("farmingEligibility in the engine contract", () => {
-  it("defaults both eligibility flags on", () => {
-    expect(DEFAULT_ENGINE_SETTINGS.farmingEligibility).toEqual({
-      farmUnlinkedCampaigns: true,
-      farmSubscriptionCampaigns: true,
-    });
+describe("per-platform eligibility in the engine contract", () => {
+  it("defaults to farming every reward, unlinked campaigns included, pinned or not", () => {
+    for (const platform of ["twitch", "kick"] as const) {
+      expect(DEFAULT_ENGINE_SETTINGS.platform[platform]).toMatchObject({
+        rewardFilter: defaultRewardFilter(platform),
+        farmPinnedOnly: false,
+        unlinkedCampaigns: "include",
+      });
+    }
   });
 
-  it("normalizes a partial eligibility record through the engine merge", () => {
+  it("normalizes each platform's switches and filter through the engine merge", () => {
+    const merged = mergeEngineSettings({
+      platform: {
+        twitch: { unlinkedCampaigns: "first" },
+        kick: { unlinkedCampaigns: "last", farmPinnedOnly: "yes", rewardFilter: "skip" },
+      },
+    } as never);
+    expect(merged.platform.kick.unlinkedCampaigns).toBe("last");
+    expect(merged.platform.kick.farmPinnedOnly).toBe(false);
+    expect(merged.platform.kick.rewardFilter).toEqual(defaultRewardFilter("kick"));
+    expect(merged.platform.twitch.unlinkedCampaigns).toBe("include");
+  });
+
+  it("keeps the retired global switches off the engine contract", () => {
     const merged = mergeEngineSettings({
       farmingEligibility: { farmUnlinkedCampaigns: false },
+      farmPinnedOnly: true,
     } as never);
-    expect(merged.farmingEligibility.farmUnlinkedCampaigns).toBe(false);
-    expect(merged.farmingEligibility.farmSubscriptionCampaigns).toBe(true);
+    expect("farmingEligibility" in merged).toBe(false);
+    expect("farmPinnedOnly" in merged).toBe(false);
   });
 
   it("keeps dropsListFilter off the engine contract", () => {

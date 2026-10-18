@@ -14,6 +14,7 @@ import type {
   CategorySelection,
   ExtensionSettings,
   Platform,
+  RewardKind,
   TwitchExtensionProviderId,
   WatchSourceId,
 } from "@lurkloot/shared/models";
@@ -55,6 +56,8 @@ import type {
 import { variantShowsPopup } from "./types";
 import {
   campaignViewFromCampaign,
+  rewardKindCounts as countRewardKinds,
+  showsSubscriptionChoice,
   reuseIfUnchanged,
   reuseUnchangedViews,
   channelViewFromSession,
@@ -89,12 +92,12 @@ import { GithubStarNudge } from "./githubStarNudge";
 import { popupNoticeSlot } from "./popupNoticeSlot";
 import { UpdateNotice } from "./updateNotice";
 import { QueuePanel } from "./queue";
-import { WATCH_SOURCE_NAME_KEYS } from "./watchSourcePriority";
 import { blockTogglePatch, favouriteTogglePatch } from "./categoryActions";
 import { CompletedPanel } from "./completed";
 import { CriticalFailurePanel } from "./criticalFailure";
 import { openHttpsLink } from "./links";
 import { IdleWatchlistPanel } from "./idleWatchlist";
+import { AccountProgressSlot } from "./accountProgress";
 import { StatusStrip } from "./statusStrip";
 import { ViewToolbarSlotContext } from "./viewToolbar";
 import { automationPresentation, type AutomationPresentation } from "./automationStatus";
@@ -102,7 +105,6 @@ import { changeTwitchExtensionEnabled, TwitchExtensionView } from "./twitchExten
 import { SettingsView } from "./settings";
 import { TipsBanner } from "./tips";
 import { TooltipScope } from "./tooltip";
-import { Tip } from "./tooltip";
 
 export function screenshotVariant(id: string | null | undefined): ScreenshotVariant {
   return SCREENSHOT_VARIANTS[id ?? "drops"] ?? SCREENSHOT_VARIANTS.drops;
@@ -854,6 +856,8 @@ export function Popup({
     inputs?: readonly unknown[];
     campaigns?: CampaignView[];
     gameMap?: Record<string, GameItem>;
+    rewardKindCounts?: Record<RewardKind, number>;
+    subscriptionChoice?: Record<Platform, boolean>;
   }>({});
 
   // The mark toggle every campaign card reads from context. Its identity never
@@ -964,7 +968,31 @@ export function Popup({
     derived.current.gameMap,
     Object.fromEntries(games.map((game) => [game.id, game])),
   );
-  derived.current = { inputs: derivationInputs, campaigns, gameMap };
+  const rewardKindCounts = inputsChanged
+    ? reuseIfUnchanged(
+        derived.current.rewardKindCounts,
+        countRewardKinds(snapshot.state.campaigns[platform], settings, platform),
+      )
+    : derived.current.rewardKindCounts!;
+  // Per platform, whether the reward filter asks about subscription rewards.
+  // Kept by value: Settings rebuilds its registry whenever this changes identity.
+  const subscriptionChoice = reuseIfUnchanged(derived.current.subscriptionChoice, {
+    twitch: showsSubscriptionChoice(
+      snapshot.state.campaigns.twitch,
+      settings.platform.twitch.rewardFilter,
+    ),
+    kick: showsSubscriptionChoice(
+      snapshot.state.campaigns.kick,
+      settings.platform.kick.rewardFilter,
+    ),
+  });
+  derived.current = {
+    inputs: derivationInputs,
+    campaigns,
+    gameMap,
+    rewardKindCounts,
+    subscriptionChoice,
+  };
   const idleWatchlistChannels = settings.platform[platform].idleWatchlistChannels;
   const idleWatchlist = idleWatchlistChannels.map((username) =>
     streamerItemFromFallback(username, session, t),
@@ -1135,31 +1163,17 @@ export function Popup({
                       : undefined
                   }
                   chatPresence={snapshot.state.chatPresence?.[platform]}
+                  accountProgress={
+                    <AccountProgressSlot
+                      poll={snapshot.state.accountProgress?.[platform]}
+                      signedIn={snapshot.state.authHealth[platform].status === "healthy"}
+                    />
+                  }
                   onCampaignClick={session.supplementalWatch ? undefined : onFarmingTitleClick}
                   onResume={resumeAfterManualClose}
                   enabled={automation[platform]}
                   pending={automationPending[platform]}
                   onToggle={(value) => setAutomation(platform, value)}
-                  sourceChip={
-                    liveSource ? (
-                      // Where the live source sits in the watch order, and the way to
-                      // change that order: the first available source always wins.
-                      <Tip label={t("watchSourceChangeOrder")}>
-                        <button
-                          type="button"
-                          data-watch-source-chip={liveSource}
-                          onClick={() => changeView("settings", `${platform}.watchSourcePriority`)}
-                          className="surface shrink-0 rounded-md px-2 py-0.5 text-[10.5px] font-medium text-zinc-600 tabular transition-colors hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                        >
-                          {t("watchSourcePosition", [
-                            t(WATCH_SOURCE_NAME_KEYS[liveSource]),
-                            String(sourceOrder.indexOf(liveSource) + 1),
-                            String(sourceOrder.length),
-                          ])}
-                        </button>
-                      </Tip>
-                    ) : undefined
-                  }
                 />
 
                 {/* The view's title and its own controls share one row: a view hands
@@ -1256,6 +1270,7 @@ export function Popup({
                                 ? "general.drops"
                                 : settingsFocus
                             }
+                            showSubscriptionChoice={subscriptionChoice}
                           />
                         ) : view === "activity" ? (
                           <ActivityLog
@@ -1428,7 +1443,18 @@ export function Popup({
                               refreshing={refreshing}
                               strategy={settings.priorityMode}
                               pinnedCount={settings.campaignPins.length}
-                              farmPinnedOnly={settings.farmPinnedOnly}
+                              farmPinnedOnly={settings.platform[platform].farmPinnedOnly}
+                              unlinkedCampaigns={settings.platform[platform].unlinkedCampaigns}
+                              platform={platform}
+                              rewardFilter={settings.platform[platform].rewardFilter}
+                              rewardKindCounts={rewardKindCounts}
+                              showSubscriptionChoice={subscriptionChoice[platform]}
+                              onRewardFilterChange={(rewardFilter) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { rewardFilter } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
                               onStrategyChange={(priorityMode) =>
                                 void updateSettings({ priorityMode }, { tickAfterSave: true })
                               }
@@ -1436,7 +1462,16 @@ export function Popup({
                                 void updateSettings({ campaignPins: [] }, { tickAfterSave: true })
                               }
                               onFarmPinnedOnlyChange={(farmPinnedOnly) =>
-                                void updateSettings({ farmPinnedOnly }, { tickAfterSave: true })
+                                void updateSettings(
+                                  { platform: { [platform]: { farmPinnedOnly } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                              onUnlinkedCampaignsChange={(unlinkedCampaigns) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { unlinkedCampaigns } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
                               }
                               onRefreshCampaign={() => refreshNow()}
                               onPinChange={(campaignId, position) =>
@@ -1490,7 +1525,7 @@ export function Popup({
                                 )
                               }
                               onOpenGames={() => changeView("games")}
-                              onOpenSettings={() => changeView("settings")}
+                              onOpenSettings={(groupId) => changeView("settings", groupId)}
                             />
                           </>
                         )}

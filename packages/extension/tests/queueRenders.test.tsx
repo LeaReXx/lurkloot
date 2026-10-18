@@ -2,6 +2,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defaultRewardFilter } from "@lurkloot/shared/rewardFilter";
 import type { DropCampaign, WatchSession } from "@lurkloot/shared/models";
 import { mergeSettings } from "@lurkloot/shared/settings";
 import { rankCampaigns } from "@lurkloot/shared/ranking";
@@ -94,6 +95,7 @@ function mount(campaigns: CampaignView[]): {
     onStrategyChange: () => undefined,
     onUnpinAll: () => undefined,
     onFarmPinnedOnlyChange: () => undefined,
+    onUnlinkedCampaignsChange: () => undefined,
     onRefreshCampaign: () => undefined,
     onPinChange: () => undefined,
     onToggleExclude: () => undefined,
@@ -111,6 +113,11 @@ function mount(campaigns: CampaignView[]): {
           strategy="ending_soonest"
           pinnedCount={0}
           farmPinnedOnly={false}
+          unlinkedCampaigns="include"
+          platform="twitch"
+          rewardFilter={defaultRewardFilter("twitch")}
+          showSubscriptionChoice={false}
+          onRewardFilterChange={() => undefined}
           {...{ ...handlers }}
         />
       </I18nContext.Provider>,

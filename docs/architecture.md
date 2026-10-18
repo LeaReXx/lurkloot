@@ -21,7 +21,7 @@ Package-qualified paths below are written as `packages/<package>/...` when owner
 - `entrypoints/background.ts` registers extension lifecycle hooks, alarms, tab-removal handling, runtime message handling, and browser-specific adapters around `@lurkloot/core`.
 - `packages/core/src/background/controller.ts` assembles the controller from its owner modules in the same directory, which coordinate settings/state persistence, scheduler ticks, popup messages, notifications, manual reward claims, and playback-control authorization.
 - `packages/core/src/core/scheduler.ts` owns platform-independent campaign selection, Idle Watchlist fallback selection, auto-claiming, retry/backoff, session state, manual-watch pauses, and watch-mode lifecycle decisions.
-- `packages/core/src/platforms/adapter.ts` defines the `PlatformAdapter` contract. `packages/core/src/platforms/twitch/index.ts` and `packages/core/src/platforms/kick/index.ts` implement platform-specific discovery, progress, candidate, validation, claim, and tab preparation behavior.
+- `packages/core/src/platforms/adapter.ts` defines the `PlatformAdapter` contract. `packages/core/src/platforms/twitch/index.ts` and `packages/core/src/platforms/kick/index.ts` implement platform-specific discovery, progress, candidate, validation, claim, and tab preparation behavior. A claim refusal that sets `reward.claimGuidance` (Kick's account-link prompt) has been explained by the adapter, so the shared claim loop does not warn about it again on each tick (#779).
 - Browser tabs are an extension-only capability (#598). `packages/core/src/core/tabRegistry.ts` (`@lurkloot/core/tabRegistry`) is the engine's side: the tab state and the rules for it (the managed-tab breaker, page-context snapshots and the recovery threshold, integrity captures and waits), with no browser code. `packages/extension/src/core/browserTabs.ts` holds the mechanics (watch tabs, playback priming, ad focus, page-context tabs and in-page fetches, the twitch.tv boot that mints an integrity token) against an injected `BrowserTabApi`, `packages/extension/src/core/tabPorts.ts` (`createExtensionTabPorts`) builds the controller's `tabs` ports from them and the user's tab settings, and `packages/extension/src/core/tabs.ts` binds the rest to the live WXT/browser APIs. `coreBoundary.test.ts` keeps tab mechanics out of core. Tab state (page contexts, the managed-tab breaker, playback priming, ad focus, integrity captures and waiters) lives in a `TabRegistry`, one per controller, never at module level. The extension creates it, binds its tab functions to it with `createBrowserTabs`, and passes it to the controller as `tabRegistry`; a host without tabs gets an empty one from the controller. `tests/tabRegistry.test.ts` checks that two controllers share no tab state (#598). Every tab the engine closes goes through `closeTab` in `browserTabs.ts`, which records a closure origin (`extension-cleanup`, `extension-recovery` or `host-restart`) in the registry before the browser call; `browserTabs.test.ts` fails if any other extension source calls `tabs.remove`. A close can fail while the tab stays open ("Tabs cannot be edited right now"), so code that forgets a managed tab or replaces it goes through `closeOwnedTab`, which tells closed, gone and still-open apart. A still-open tab stays owned, and nothing opens a replacement beside it (#794). New platform behavior reaches these mechanics as an injected function wired per platform in `background.ts`, such as a `PageDocumentInspector`, rather than as a platform or origin branch inside `browserTabs.ts`, `tabPorts.ts` or `tabs.ts`. The Kick bearer in `pageFetchJson` and the twitch.tv integrity boot are older exceptions. `handleTabRemoved` takes that origin, defaulting to `user`, and only a `user` close of the managed watch tab creates a manual-close pause. The tick closes its tab with no lock held, so the removal event can land before it commits. The record outlives the removal event (bounded, since browsers do not reuse tab ids), so a playback report still in flight from a tab the engine closed is dropped as a late result instead of reading as the user watching. The host forwards tab events through `TabEventsPort` (`handleTabRemoved`, `handleTabUpdated`).
 - `packages/core/src/core/transport.ts` (`@lurkloot/core/transport`) holds the cookie-backed background fetchers for Twitch GQL and Kick's API, with no tab state. The Twitch fetcher takes an injected request identity (integrity token and client session id), so the extension replays the page-captured token and tabless hosts send none. The CLI imports only this module and no tab code; `packages/cli/tests/tabBoundary.test.ts` guards that (#598).
 - `entrypoints/twitch.content.ts` and `entrypoints/kick.content.ts` start shared playback telemetry/control on platform pages.
@@ -139,6 +139,7 @@ The per-module slices and calls below are where #591's dependency check starts:
 | `authHealth.ts` | its own refresh generations (#595) | `discovery`, `discoverySignals`, `reporting`, `stateCommit` | 5 |
 | `manualWatch.ts` | the watch-tab effect handlers (#591), `lifecycleSlice` (read) | `discovery`, `reporting`, `stateCommit`, `tickAdmission` | 9 |
 | `supplementalSources.ts` | the supplemental target effect handler (#591) | none | 1 |
+| `accountProgress.ts` | its own in-flight reads, `lifecycleSlice` (read) | `reporting`, `stateCommit` | 3 |
 | `claimService.ts` | its own handoffs, waiting reward ids, drop-claim operations, reward claim guards and job reschedule queue (#597), `lifecycleSlice` | `heartbeat`, `lifecycle`, `reporting`, `stateCommit`, `tickAdmission` | 13 |
 | `discoverySignals.ts` | `signalSlice`, `lifecycleSlice` (read), a commit hook | `reporting`, `tickAdmission` | 13 |
 | `settingsTransitions.ts` | the transaction, `settingsSlice` (the Twitch settings-transition generation), `lifecycleSlice` (read) | `channelPoints`, `claimService`, `discovery`, `discoverySignals`, `kickRuntime`, `lifecycle`, `stateCommit`, `tickAdmission` | 8 |
@@ -168,7 +169,7 @@ or settings, loaded and saved through the host's storage port (`storage.local` o
 
 | State group | Where it lives | Written by | Invalidated by | Commit boundary | Restart | Hosts |
 | --- | --- | --- | --- | --- | --- | --- |
-| Scheduler state (`sessions`, `authHealth`, `campaigns`, `criticalHealth`, backoffs, `lastTickAt`) | Persisted | Ticks, heartbeats, auth, claims, message handlers | Newer commits for the same platform | The transaction's `commit` / `commitPlatformSnapshot`, merged per platform by `mergePlatformState` (derived from `SCHEDULER_STATE_MERGE`) | Reloaded. `reconcileStartup` runs `staleStartupCleanup` on both hosts | Both |
+| Scheduler state (`sessions`, `authHealth`, `campaigns`, `criticalHealth`, `accountProgress`, backoffs, `lastTickAt`) | Persisted | Ticks, heartbeats, auth, claims, the account-progress job, message handlers | Newer commits for the same platform | The transaction's `commit` / `commitPlatformSnapshot`, merged per platform by `mergePlatformState` (derived from `SCHEDULER_STATE_MERGE`) | Reloaded. `reconcileStartup` runs `staleStartupCleanup` on both hosts | Both |
 | Discovery lanes (`discoveryLanes`, `discoveryEvents`) | In memory, one `DiscoverySnapshotLane` per platform | `refreshDiscovery` | Settings saves that are not ranking-only, auth invalidation, `refreshDiscovery` itself, reset and shutdown | None: a snapshot is published by revision, not stored | Rediscovered on the first tick | Both |
 | Selection (`selectionCache`, `selectionRuns`, `pendingSelections`, `selectionGeneration`) | In memory | `prepareSelection` (before the lock), `reselectUnderLock` (inside it, never through `selectionRuns`) | `invalidateSelection`: every settings save (including ranking-only), auth invalidation, heartbeat results, playback telemetry, reset, shutdown | Consumed inside `runTick`'s platform lock | Recomputed | Both |
 | Tick admission (`tickAdmission`, `activeTicks`, `tickBatches`, `backgroundWork`) | In memory | `tick`, `tickInBackground`, `tickAndHandOff` | Disable, reset, shutdown | None | Empty | Both. Extension alarms and CLI intervals request ticks per platform |
@@ -551,7 +552,7 @@ re-ensures its jobs on every start, through the startup reconciliation below.
 lacks is inert: ensuring it schedules nothing and a fire of it does nothing. On the CLI that covers
 the manual-watch claim jobs and Kick challenges (browser tabs) and the integrity refresh (integrity
 capture). The one-minute channel-points job runs on both hosts (#590); the CLI used to claim channel
-points only at poll cadence. The
+points only at poll cadence. The one-minute account-progress job runs on both hosts too. The
 host delivers fires to `controller.runJob(name)`. Since #591 that includes the CLI's tick jobs: it has
 no tick driver of its own. A disabled platform's tick cleans up its state, as it always did on the
 extension, and logs "Platform disabled" once, when it becomes disabled. The CLI logs subscription
@@ -623,7 +624,7 @@ The popup and content scripts do not call adapters directly. They send typed run
 Important setting groups:
 
 - Global automation: `running`, `autoStartDropFarming`, per-platform `enabled`.
-- Farming behavior: `autoClaim`, `autoClaimChannelPoints`, `priorityMode`, `campaignPins`, `farmPinnedOnly`, `excludedCampaignIds`, `farmingEligibility`.
+- Farming behavior: `autoClaim`, `autoClaimChannelPoints`, `priorityMode`, `campaignPins`, `excludedCampaignIds`, and per platform `rewardFilter`, `farmPinnedOnly` and `unlinkedCampaigns`.
 - Platform preferences: `platform[platform].watchSourcePriority`, `platform[platform].idleWatchlistChannels`, `platform[platform].excludedChannels`, `platform[platform].categoryMode`, `platform[platform].categories`, `platform[platform].favouriteCategories`, and `platform[platform].blockedCategories`.
 
 `categoryMode` is `"all"` or `"include"`, and one stored `categories` list serves
@@ -667,21 +668,49 @@ facade (#583, #591). "Background controller ownership and concurrency" above has
 `rankCampaigns` in `@lurkloot/shared/ranking` is the only campaign order in the
 product. The scheduler picks from it, the keep-watching comparison reads it, and
 the popup's Queue renders it, so the rank on a card is the position the engine
-acts on. Three tiers, in order:
+acts on. Four tiers, in order:
 
 1. `campaignPins` — an ordered, sparse list of campaign ids the user placed by
    hand. Dragging a card, or typing a rank, pins that one campaign; everything
    else keeps the tier it had.
 2. `platform[platform].favouriteCategories` — campaigns of starred games, in the
-   order they were starred. A standing preference that survives campaign churn,
-   so next season's campaign of a starred game is already high.
+   user's order. A new star goes last; the Games view reorders favourites the
+   way the Queue reorders pins, by dragging or typing a number (#847). A
+   standing preference that survives campaign churn, so next season's campaign
+   of a starred game is already high. A blocked favourite keeps its star and its
+   slot in the array but takes no number (`rankedFavouriteCategories`), and
+   reordering moves a favourite into a shown neighbour's slot, so hidden ones
+   stay where they were.
 3. `priorityMode` — one live strategy (`ending_soonest` or
    `lowest_availability`), then name, then id.
+4. With a platform's `unlinkedCampaigns` set to `"last"`, its unlinked campaigns
+   (`isCampaignUnlinked`) that tiers 1 and 2 did not place, by the same
+   strategy. The tier is assigned after the pin and favourite checks, so a pin
+   or a starred game keeps its rank whatever the link state. The scheduler
+   walks this order, so an unlinked campaign is farmed only once no linked one
+   above it has a channel, and it gives way, mid-reward, as soon as one does,
+   as any lower-ranked watch does.
 
 Eligibility is always decided before ranking (`evaluateCampaignFarming`), so a
 pin can never rescue a campaign an exclusion, a block or a class filter refused.
-`farmPinnedOnly` is an eligibility switch, not a mode: a strategy is always in
-effect. Only a pin counts as an explicit override for keep-watching — a
+Each platform's `farmPinnedOnly` is an eligibility switch, not a mode: a
+strategy is always in effect. Each platform's `unlinkedCampaigns` is
+`include`, `skip` or `last`; only `skip` is eligibility (`unlinked_campaigns_disabled`,
+which a pin does not lift), and `last` is ranking only. The Queue's Rewards to
+farm menu and Settings edit it with the same `UnlinkedCampaignsField`, and the
+Skipped row's fix sets it to `last`. Each platform's `rewardFilter`
+(`{ kinds, subscriptions }`, edited from the Queue's Rewards to farm menu and
+Settings) is eligibility too. `kinds` is any of `item`, `badge`, `emote`
+(Twitch supports all three, Kick only `item`; `PLATFORM_REWARD_KINDS`), an
+empty list means every kind, and a benefit with no type counts as `item`.
+`subscriptions` is `include`, `skip` or `only`. A reward matches when any of its
+kinds is selected and it passes the subscription mode; a marked subscription
+reward passes `skip` and
+still counts under `only`. Only matching rewards and the rewards they wait on
+are targeted (`rewardsInFarmingScope`): a campaign with none is skipped with
+`reward_type_filtered`, carrying `filteredBy` to say which part of the filter
+excluded it, and one whose matching rewards are earned with
+`reward_types_obtained`. Claiming is not narrowed. Only a pin counts as an explicit override for keep-watching — a
 favourite ranks what is picked next but never abandons earned progress.
 - Tab/playback behavior: `tablessMode`, `muteFarmingTabs`, `keepFarmingVideosUnmuted`, `pauseOnManualWatch`, `autoCloseFinishedDrops`, `offlineRetryLimit`.
 - Notifications: `notifyRewardEarned`, `notifyNoDropsLeft`.
@@ -736,8 +765,9 @@ Migration 2 replaces the old `campaignVisibility` record, which in every shipped
 release was display-only — it decided what the popup's Drops list showed and
 never affected farming. The new split puts two settings on opposite sides of the
 engine/extension boundary: `EngineSettings.farmingEligibility`
-(`farmUnlinkedCampaigns`, `farmSubscriptionCampaigns`), which the scheduler and
-CLI honour, and `ExtensionSettings.dropsListFilter`
+(`farmUnlinkedCampaigns`, `farmSubscriptionCampaigns`; both replaced per
+platform by migration 8, and the unlinked switch by `unlinkedCampaigns` in
+migration 9), which the scheduler and CLI honour, and `ExtensionSettings.dropsListFilter`
 (`showUpcoming`/`showExpired`/`showFinished`/`showExcluded`), a popup-only view
 preference the CLI rejects as extension-only. Farming eligibility and list
 visibility are independent: hiding a campaign from the Drops list never stops it
@@ -765,6 +795,23 @@ campaigns into Queue, Skipped, Upcoming and Completed rather than hiding classes
 of them. Nothing here narrows farming: the same campaigns stay eligible, in the
 order the user's own placements imply.
 
+Migration 8 moves the global farming switches onto each platform. The global
+`farmingEligibility` and `farmPinnedOnly`, and `platform.<p>.farmRewardTypes`,
+are removed in favour of `platform.<p>.rewardFilter`, `farmPinnedOnly` and
+`farmUnlinkedCampaigns`. `farmRewardTypes` containing `badge` becomes
+`kinds: ["badge"]`; `no_subscription` alone becomes `subscriptions: "skip"` and
+`subscription` alone `"only"`; both or neither keep `"include"`. A global
+`farmSubscriptionCampaigns: false` becomes `"skip"` unless the old tabs already
+chose a mode, the global `farmUnlinkedCampaigns` and `farmPinnedOnly` are copied
+to both platforms, and a current per-platform key always wins over a legacy one.
+Each move reports a deprecation diagnostic.
+
+Migration 9 turns each platform's `farmUnlinkedCampaigns` boolean into
+`unlinkedCampaigns`: `true` becomes `"include"` and `false` `"skip"`, so
+farming is unchanged; the third option, `"last"`, is only ever chosen by the
+user. A current `unlinkedCampaigns` wins, and any other legacy value moves
+across as it is for normalization, or the CLI's validation, to judge.
+
 ## Scheduler Flow
 
 Each scheduler tick runs enabled platforms independently:
@@ -783,8 +830,9 @@ Steps 1–8 decide and name their side effects; the tick's effect executor perfo
 
 Campaign ordering is shared across platforms and lives in one function,
 `rankCampaigns` (see [Campaign ranking](#campaign-ranking)): pinned campaigns in
-pin order, then campaigns of favourite games in star order, then the single live
-strategy, then name and id. Channel ordering within the selected campaign is also shared: allow-listed channels first, then channels the user has a relationship with (an Idle Watchlist entry ahead of a followed channel, via the adapter's optional `listFollowedChannels`), then viewer count. That preference only picks between channels that already qualify for the campaign, so it never changes what is farmed. `preferKnownChannels` (on by default) gates the whole thing; off, ordering is allow-list then viewer count only, and `listFollowedChannels` is never called. Per-platform excluded drop channels filter campaign and supplemental provider candidates; they do not suppress explicitly listed Idle Watchlist channels. `farmingEligibility` also narrows eligibility, through its two farming flags (`farmUnlinkedCampaigns`, `farmSubscriptionCampaigns`), as do `blockedCategories` and `farmPinnedOnly` — all of them before ranking, never through it.
+pin order, then campaigns of favourite games in the user's order, then the single live
+strategy, then name and id, and last the unlinked campaigns of a platform set to
+farm them last. Channel ordering within the selected campaign is also shared: allow-listed channels first, then channels the user has a relationship with (an Idle Watchlist entry ahead of a followed channel, via the adapter's optional `listFollowedChannels`), then viewer count. That preference only picks between channels that already qualify for the campaign, so it never changes what is farmed. `preferKnownChannels` (on by default) gates the whole thing; off, ordering is allow-list then viewer count only, and `listFollowedChannels` is never called. Per-platform excluded drop channels filter campaign and supplemental provider candidates; they do not suppress explicitly listed Idle Watchlist channels. The per-platform `unlinkedCampaigns` (`skip` only), `farmPinnedOnly` and `rewardFilter` also narrow eligibility, as do `blockedCategories` — all of them before ranking, never through it.
 
 For exactly how a campaign's farmability (`campaignFarmable`, feeding `isEligible`) and the popup list it lands in (`campaignSection`) are decided — and why they deliberately diverge on reward timing — see [`campaign-farmability-visibility.md`](campaign-farmability-visibility.md).
 
@@ -871,6 +919,38 @@ Stopping behavior depends on ownership and settings:
 ## Tabless Watch
 
 Tabless watching is the default (`tablessMode: true`). When it is on, or the host has no browser tabs, supported adapters create a `TablessWatchController` instead of opening a watch tab. Twitch's default web heartbeat requests HLS segment headers. Older minute-watched heartbeats stay selectable. Kick maintains a viewer WebSocket and sends watch livestream events. The one-minute watch alarm records heartbeat health in the platform session. A browser host falls back to a visible muted tab after repeated failures, and that tab plays stream video. The headless CLI keeps retrying tabless heartbeats because it cannot open a tab.
+
+## Account Progress
+
+A platform may track the viewer's own progress (Kick: the global viewer level and the daily watch
+streak). The shared abstraction is only "this platform has account progress to show beside its
+switch"; it says nothing about levels or streaks, so a platform that adds something with other
+semantics adds its own shape instead of bending a common one.
+
+- **Model** (`@lurkloot/shared/models`): `PlatformAccountProgress` is a union tagged by `platform`,
+  one member per platform that has progress (today only `KickAccountProgress`). `state.accountProgress`
+  holds one `AccountProgressPoll` per platform: the attempt stamp `lastCheckedAt`, and the last good
+  read `progress` with its `fetchedAt`. It is persisted, merged as `optionalPlatform`.
+- **Adapter**: the optional `fetchAccountProgress`. Kick's (`platforms/kick/accountProgress.ts`)
+  reads `web.kick.com/api/v1/gamification/user/level`, then
+  `/gamification/users/{user_id}/streak` for the user the level belongs to. A failed streak read
+  keeps the level; an unreadable level reads nothing.
+- **Job, never the tick** (`background/accountProgress.ts`): `lurkloot.account-progress` wakes every
+  minute on every host, so no tick waits on a platform's progress endpoint. A wake only compares
+  the stored stamp; a platform is read when it is enabled, signed in and its 10-minute stamp is due
+  (`accountProgressPollDue`), independent of `autoClaimChallenges` and of manual watching. One read
+  per platform is in flight at a time. The read holds no lock; its result is committed onto the
+  latest state under the platform lock, moving the stamp on every attempt and keeping the last good
+  read until a new one lands. It is display only: a failure is a debug diagnostic, never an auth
+  status, a platform error or backoff. Shutdown and host reset abort a read before it commits. A
+  disabled or signed-out platform is not read, so its last read stays as it was.
+- **Popup**: `StatusStrip` has an `accountProgress` slot beside the switch. `AccountProgressSlot`
+  (`popup-ui/src/accountProgress.tsx`) picks the view from a map keyed by the progress's own
+  `platform` tag, and shows nothing while the platform is signed out or in the narrow (under
+  560px) layout, where the strip has no room beside the watching lines, source chip and switch. The Kick view
+  (`kickAccountProgress.tsx`) draws its own badge (no Kick assets) with the level in the
+  digits-only "Archivo Condensed Digits" face, declared in `popup-ui/src/fonts.css` and the site's
+  `global.css`.
 
 ## Chat Presence
 

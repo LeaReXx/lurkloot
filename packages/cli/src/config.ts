@@ -41,7 +41,6 @@ export function defaultConfigJsonc(): string {
   const defaults = DEFAULT_CLI_SETTINGS;
   const twitch = defaults.platform.twitch;
   const kick = defaults.platform.kick;
-  const eligibility = defaults.farmingEligibility;
   return `{
   // "impersonate" works with both Twitch and Kick. Use "http" only for a
   // lighter Twitch-only setup; Kick's API rejects plain Node TLS requests.
@@ -64,8 +63,6 @@ export function defaultConfigJsonc(): string {
     // Campaign IDs to farm first, in this order. Everything else follows the
     // favourite games below, then priorityMode.
     "campaignPins": ${json(defaults.campaignPins)},
-    // Farm nothing but the pinned campaigns above.
-    "farmPinnedOnly": ${json(defaults.farmPinnedOnly)},
     "excludedCampaignIds": ${json(defaults.excludedCampaignIds)},
 
     // Prefer an Idle Watchlist or followed channel over a bigger anonymous one
@@ -91,15 +88,6 @@ export function defaultConfigJsonc(): string {
     "criticalFailurePromptEnabled": ${json(defaults.criticalFailurePromptEnabled)},
     "notifyRewardEarned": ${json(defaults.notifyRewardEarned)},
     "notifyNoDropsLeft": ${json(defaults.notifyNoDropsLeft)},
-
-    // Which campaigns LurkLoot is allowed to farm. Both default true; set a key
-    // to false to skip campaigns needing an account link or requiring a channel
-    // subscription. (The extension's display-only Drops-list filter is not a CLI
-    // setting — a headless run has no Drops list.)
-    "farmingEligibility": {
-      "farmUnlinkedCampaigns": ${json(eligibility.farmUnlinkedCampaigns)},
-      "farmSubscriptionCampaigns": ${json(eligibility.farmSubscriptionCampaigns)}
-    },
 
     // Compatibility identifiers are bundled with this LurkLoot release.
     // "auto" is recommended. Raw destinations and hashes cannot be supplied.
@@ -128,6 +116,19 @@ export function defaultConfigJsonc(): string {
         // "all" farms every category, "include" farms only the categories
         // listed below. Neither mode ranks.
         "categoryMode": ${json(twitch.categoryMode)},
+        // Which rewards to farm. "kinds": any of "item", "badge", "emote"
+        // ([] means all). "subscriptions": "include" farms subscription rewards
+        // too, "skip" leaves them out, "only" farms just subscription rewards
+        // (they wait on you subscribing to the channel). Only matching
+        // rewards (and what they wait on) are farmed, and a campaign is left
+        // once those are earned.
+        "rewardFilter": ${json(twitch.rewardFilter)},
+        // Farm nothing but this platform's pinned campaigns (campaignPins).
+        "farmPinnedOnly": ${json(twitch.farmPinnedOnly)},
+        // Campaigns that need an account link: "include" farms them like any
+        // other, "skip" never farms them, "last" farms them only once no linked
+        // campaign can be (a pin or a favourite game still keeps its rank).
+        "unlinkedCampaigns": ${json(twitch.unlinkedCampaigns)},
         // Used by "include" for eligibility; also seeds partial Twitch live-
         // channel discovery when the campaign dashboard is unavailable, even
         // in "all" mode. Add game IDs and names you want the CLI to scan.
@@ -162,6 +163,13 @@ export function defaultConfigJsonc(): string {
         // "all" farms every category, "include" farms only the categories
         // listed below. Neither mode ranks.
         "categoryMode": ${json(kick.categoryMode)},
+        // Like Twitch's rewardFilter. Kick rewards are all "item" kind.
+        "rewardFilter": ${json(kick.rewardFilter)},
+        // Farm nothing but this platform's pinned campaigns (campaignPins).
+        "farmPinnedOnly": ${json(kick.farmPinnedOnly)},
+        // Like Twitch's unlinkedCampaigns: "include", "skip" or "last" (Kick
+        // credits watch time before linking).
+        "unlinkedCampaigns": ${json(kick.unlinkedCampaigns)},
         // Used by "include". Order has no scheduling effect.
         "categories": ${json(kick.categories)},
         // Campaigns of these categories rank above the strategy, in this order,

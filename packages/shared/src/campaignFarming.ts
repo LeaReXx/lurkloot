@@ -1,7 +1,18 @@
 import { campaignPassesCategoryFilter, isCampaignCategoryBlocked } from "./categories";
-import type { DropCampaign, DropReward, EngineSettings } from "./models";
+import type {
+  DropCampaign,
+  DropReward,
+  EngineSettings,
+  RewardFilter,
+  RewardFilterMiss,
+} from "./models";
 import {
-  campaignHasSubscriptionRewards,
+  campaignFilterMiss,
+  defaultRewardFilter,
+  isRewardFilterNarrowed,
+  rewardMatchesFilter,
+} from "./rewardFilter";
+import {
   canClaimReward,
   isRewardAvailableToEarn,
   isRewardObtained,
@@ -9,6 +20,7 @@ import {
   isWatchReward,
   rewardFeasibility,
 } from "./rewards";
+import { isCampaignUnlinked } from "./unlinkedCampaigns";
 
 export type CampaignFarmingRejectionCode =
   | "excluded"
@@ -17,10 +29,11 @@ export type CampaignFarmingRejectionCode =
   | "completed"
   | "unlinked_campaigns_disabled"
   | "twitch_link_required"
-  | "subscription_campaigns_disabled"
   | "category_filtered"
   | "category_blocked"
   | "not_pinned"
+  | "reward_type_filtered"
+  | "reward_types_obtained"
   | "no_rewards"
   | "no_unclaimed_rewards"
   | "reward_prerequisites_unmet"
@@ -42,6 +55,8 @@ export type CampaignFarmingEvaluation =
       remainingMinutes?: number;
       availableMinutes?: number;
       marginMinutes?: number;
+      // Set only for reward_type_filtered: which half of the filter missed.
+      filteredBy?: RewardFilterMiss;
     };
 
 export interface CampaignFarmingEvaluationOptions {
@@ -67,6 +82,28 @@ function parsedTime(value: string | undefined): number | undefined {
   return Number.isNaN(time) ? undefined : time;
 }
 
+// The rewards the engine farms toward: the matching ones and every reward they
+// wait on (a Twitch precondition), which has to be claimed first. Claiming is
+// not narrowed: a reward that is already claimable is claimed whatever the
+// filter.
+export function rewardsInFarmingScope(
+  campaign: Pick<DropCampaign, "rewards">,
+  filter: RewardFilter,
+): DropReward[] {
+  const byId = new Map(campaign.rewards.map((reward) => [reward.id, reward]));
+  const scoped = new Set<string>();
+  const visit = (reward: DropReward): void => {
+    if (scoped.has(reward.id)) return;
+    scoped.add(reward.id);
+    for (const id of reward.preconditionRewardIds ?? []) {
+      const precondition = byId.get(id);
+      if (precondition) visit(precondition);
+    }
+  };
+  campaign.rewards.filter((reward) => rewardMatchesFilter(reward, filter)).forEach(visit);
+  return campaign.rewards.filter((reward) => scoped.has(reward.id));
+}
+
 export function evaluateCampaignFarming(
   campaign: DropCampaign,
   settings: EngineSettings,
@@ -82,34 +119,45 @@ export function evaluateCampaignFarming(
   if (campaignEndsAt !== undefined && campaignEndsAt < now) return rejected("expired");
   if (campaign.status === "completed" || campaign.eligibility === "completed")
     return rejected("completed");
-  const accountUnlinked =
-    campaign.accountLinked === false || campaign.eligibility === "account_not_linked";
-  if (accountUnlinked && !settings.farmingEligibility.farmUnlinkedCampaigns) {
+  const platformSettings = settings.platform[campaign.platform];
+  // Only "skip" refuses an unlinked campaign. "last" keeps it farmable and
+  // leaves its place to the ranking (rankCampaigns).
+  if (isCampaignUnlinked(campaign) && platformSettings.unlinkedCampaigns === "skip") {
     return rejected("unlinked_campaigns_disabled");
   }
-  if (
-    campaignHasSubscriptionRewards(campaign)
-    && !settings.farmingEligibility.farmSubscriptionCampaigns
-  ) {
-    return rejected("subscription_campaigns_disabled");
-  }
-  if (isCampaignCategoryBlocked(campaign, settings.platform[campaign.platform])) {
+  if (isCampaignCategoryBlocked(campaign, platformSettings)) {
     return rejected("category_blocked");
   }
-  if (!campaignPassesCategoryFilter(campaign, settings.platform[campaign.platform])) {
+  if (!campaignPassesCategoryFilter(campaign, platformSettings)) {
     return rejected("category_filtered");
   }
+  // A campaign without rewards has nothing to filter; it is reported as such.
+  if (campaign.rewards.length === 0 || campaign.eligibility === "no_rewards")
+    return rejected("no_rewards");
+  const filter = platformSettings.rewardFilter;
+  const filteredBy = campaignFilterMiss(campaign, filter);
+  if (filteredBy) return { farmable: false, code: "reward_type_filtered", filteredBy };
+  const unclaimed = rewardsInFarmingScope(campaign, filter).filter(
+    (reward) => !isRewardObtained(reward),
+  );
+  if (unclaimed.length === 0) {
+    return rejected(
+      isRewardFilterNarrowed(filter, campaign.platform)
+        && campaign.rewards.some((reward) => !isRewardObtained(reward))
+        ? "reward_types_obtained"
+        : "no_unclaimed_rewards",
+    );
+  }
+  // Farm pinned only narrows within what the reward filter keeps, so it is
+  // judged after it: an unpinned campaign the filter excludes says so first,
+  // and "not pinned" names only campaigns a pin would start farming (#731).
   if (
     options.includePinnedOnly
-    && settings.farmPinnedOnly
+    && platformSettings.farmPinnedOnly
     && !settings.campaignPins.includes(campaign.id)
   ) {
     return rejected("not_pinned");
   }
-  if (campaign.rewards.length === 0 || campaign.eligibility === "no_rewards")
-    return rejected("no_rewards");
-  const unclaimed = campaign.rewards.filter((reward) => !isRewardObtained(reward));
-  if (unclaimed.length === 0) return rejected("no_unclaimed_rewards");
 
   const blockers: Rejection[] = [];
   for (const reward of unclaimed) {
@@ -225,16 +273,22 @@ function withBlockerLifted(
       };
     case "not_pinned":
       return { ...settings, campaignPins: [...settings.campaignPins, campaign.id] };
+    case "reward_type_filtered":
+    case "reward_types_obtained":
+      // The default filter cannot lift a miss it would make itself (a reward of
+      // a kind the platform never farms); ending here keeps the replay finite.
+      if (
+        !isRewardFilterNarrowed(
+          settings.platform[campaign.platform].rewardFilter,
+          campaign.platform,
+        )
+      )
+        return undefined;
+      return withPlatform({ rewardFilter: defaultRewardFilter(campaign.platform) });
     case "unlinked_campaigns_disabled":
-      return {
-        ...settings,
-        farmingEligibility: { ...settings.farmingEligibility, farmUnlinkedCampaigns: true },
-      };
-    case "subscription_campaigns_disabled":
-      return {
-        ...settings,
-        farmingEligibility: { ...settings.farmingEligibility, farmSubscriptionCampaigns: true },
-      };
+      // "Farm last" is the smallest step that farms it: it queues the campaign
+      // without moving it ahead of the linked ones.
+      return withPlatform({ unlinkedCampaigns: "last" });
     case "category_blocked":
       return withPlatform({ blockedCategories: [] });
     case "category_filtered":

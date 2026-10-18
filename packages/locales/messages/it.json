@@ -47,6 +47,24 @@
   "languageTurkish": {
     "message": "Turco"
   },
+  "languageJapanese": {
+    "message": "Giapponese"
+  },
+  "languageIndonesian": {
+    "message": "Indonesiano"
+  },
+  "languagePolish": {
+    "message": "Polacco"
+  },
+  "languageKorean": {
+    "message": "Coreano"
+  },
+  "languageUkrainian": {
+    "message": "Ucraino"
+  },
+  "languageCzech": {
+    "message": "Ceco"
+  },
   "settingsLanguageTitle": {
     "message": "Lingua"
   },
@@ -98,6 +116,9 @@
   "queueSkipped": {
     "message": "Saltate"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 fuori dal filtro ricompense"
+  },
   "queueActionRequired": {
     "message": "Azione richiesta"
   },
@@ -110,32 +131,20 @@
   "queueStrategyLabel": {
     "message": "Poi per"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Farma solo le fissate"
-  },
   "queueUnpinAll": {
     "message": "Rimuovi tutte ($1)"
   },
   "queueUnpin": {
     "message": "Rimuovi"
   },
-  "queueFacetLabel": {
-    "message": "Tipo di campagna"
-  },
-  "queueFacetAll": {
-    "message": "Tutte"
-  },
-  "queueFacetDrops": {
-    "message": "Drops"
-  },
-  "queueFacetBadges": {
-    "message": "Badge abbonato"
-  },
   "queueFixInclude": {
     "message": "Includi"
   },
   "queueFixPin": {
     "message": "Fissa"
+  },
+  "queueFixFarmAll": {
+    "message": "Farma tutto"
   },
   "queueFixGames": {
     "message": "Apri Giochi"
@@ -146,8 +155,8 @@
   "queueEmpty": {
     "message": "Al momento non c'è niente da farmare."
   },
-  "queueEmptyBadges": {
-    "message": "Al momento nessuna campagna in abbonamento è farmabile."
+  "queueEmptyRewardTypes": {
+    "message": "Al momento non c'è niente dei tipi selezionati da farmare."
   },
   "completedTabFinished": {
     "message": "Terminate"
@@ -370,6 +379,18 @@
   },
   "subscriptionProgressUnknown": {
     "message": "Avanzamento non disponibile"
+  },
+  "rewardBadge": {
+    "message": "Badge"
+  },
+  "rewardBadgeNamed": {
+    "message": "Badge: $1"
+  },
+  "rewardAlsoWatch": {
+    "message": "Più $1 di visione"
+  },
+  "rewardClaimable": {
+    "message": "Pronto da riscattare"
   },
   "notEarnableByWatching": {
     "message": "Non ottenibile guardando"
@@ -741,13 +762,10 @@
     "message": "Tutte le ricompense di questa campagna sono complete."
   },
   "campaignRejectionUnlinkedDisabled": {
-    "message": "Il farming senza un account collegato è disattivato."
+    "message": "Le campagne senza account collegato sono impostate su Salta."
   },
   "campaignRejectionTwitchLinkRequired": {
     "message": "Questa campagna Twitch richiede di collegare un account."
-  },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Il farming delle campagne con abbonamento è disattivato."
   },
   "campaignRejectionCategoryFiltered": {
     "message": "Questa campagna non corrisponde alle categorie selezionate."
@@ -757,6 +775,18 @@
   },
   "campaignRejectionNotPinned": {
     "message": "Al momento vengono farmate solo le campagne fissate."
+  },
+  "campaignRejectionRewardKind": {
+    "message": "Nessuna ricompensa di questa campagna corrisponde ai tipi scelti ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Le sue ricompense richiedono un abbonamento, e le stai saltando."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "Non ha ricompense per abbonamento, e stai farmando solo quelle."
+  },
+  "campaignRejectionRewardTypesObtained": {
+    "message": "Le sue ricompense dei tipi che farmi sono già ottenute."
   },
   "campaignRejectionNoRewards": {
     "message": "Questa campagna non ha ricompense farmabili."
@@ -902,17 +932,116 @@
   "activityLogLevelsDescription": {
     "message": "Scegli quali livelli registrare nel log attività. Gli errori vengono sempre mantenuti."
   },
-  "farmUnlinkedTitle": {
-    "message": "Farma campagne senza account collegato"
+  "rewardFilterTitle": {
+    "message": "Ricompense da farmare"
   },
-  "farmUnlinkedDescription": {
-    "message": "Se disattivato, le campagne che richiedono un account collegato vengono saltate. La piattaforma può comunque richiedere il collegamento quando è attivo."
+  "rewardFilterDescription": {
+    "message": "Cosa farma Lurkloot su $1. Il menu filtri nella Coda modifica la stessa impostazione."
   },
-  "farmSubscriptionTitle": {
-    "message": "Farma campagne che richiedono un abbonamento"
+  "rewardKindsTitle": {
+    "message": "Tipi di ricompensa"
   },
-  "farmSubscriptionDescription": {
-    "message": "Se disattivato, le campagne le cui ricompense richiedono un abbonamento al canale vengono saltate."
+  "rewardKindsDescription": {
+    "message": "Una ricompensa viene farmata se una sua parte corrisponde."
+  },
+  "rewardKindItem": {
+    "message": "Oggetti in gioco"
+  },
+  "rewardKindBadge": {
+    "message": "Badge"
+  },
+  "rewardKindEmote": {
+    "message": "Emote"
+  },
+  "rewardKindItemShort": {
+    "message": "Oggetti"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Ricompense per abbonamento"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Ricompense che richiedono un abbonamento al canale."
+  },
+  "subscriptionModeInclude": {
+    "message": "Includi"
+  },
+  "subscriptionModeSkip": {
+    "message": "Salta"
+  },
+  "subscriptionModeOnly": {
+    "message": "Solo"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Le ricompense per abbonamento vengono farmate insieme alle altre."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Le ricompense che richiedono un abbonamento non vengono farmate."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Vengono farmate solo le ricompense che richiedono un abbonamento."
+  },
+  "unlinkedCampaignsTitle": {
+    "message": "Campagne senza account collegato"
+  },
+  "unlinkedCampaignsDescription": {
+    "message": "Includi, salta o farma per ultime le campagne che richiedono il collegamento del tuo account di gioco. I requisiti della piattaforma possono comunque richiedere il collegamento prima di riscattare una ricompensa."
+  },
+  "unlinkedModeInclude": {
+    "message": "Includi"
+  },
+  "unlinkedModeSkip": {
+    "message": "Salta"
+  },
+  "unlinkedModeLast": {
+    "message": "Farma per ultime"
+  },
+  "unlinkedModeIncludeHint": {
+    "message": "Farmate insieme alle altre. Collega l’account per riscattare le loro ricompense."
+  },
+  "unlinkedModeSkipHint": {
+    "message": "Non viene mai farmata, anche se fissata."
+  },
+  "unlinkedModeLastHint": {
+    "message": "Viene farmata solo quando nessuna campagna collegata può esserlo. Le campagne fissate e i giochi preferiti mantengono la loro posizione."
+  },
+  "rewardFilterNoUnlinked": {
+    "message": "salta non collegate"
+  },
+  "rewardFilterUnlinkedLast": {
+    "message": "non collegate per ultime"
+  },
+  "queueGroupUnlinked": {
+    "message": "Non collegate · farmate per ultime"
+  },
+  "rankReasonUnlinked": {
+    "message": "Account non collegato"
+  },
+  "queueFixFarmLast": {
+    "message": "Farma per ultime"
+  },
+  "rewardFilterAll": {
+    "message": "Tutte le ricompense"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Tutti"
+  },
+  "rewardFilterNoSub": {
+    "message": "senza abb."
+  },
+  "rewardFilterSubOnly": {
+    "message": "solo abb."
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "solo fissate"
+  },
+  "rewardFilterReset": {
+    "message": "Ripristina tutte le ricompense"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Farma solo le campagne fissate"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "Su $1 vengono farmate solo le campagne fissate nella Coda."
   },
   "forgetExcludedTitle": {
     "message": "Dimentica campagne escluse"
@@ -1853,12 +1982,6 @@
   "navWatchingNow": {
     "message": "In visione ora"
   },
-  "watchSourcePosition": {
-    "message": "$1 · $2 di $3"
-  },
-  "watchSourceChangeOrder": {
-    "message": "Cambia l’ordine di visione"
-  },
   "gamesFavouritesGroup": {
     "message": "Preferiti"
   },
@@ -1963,5 +2086,17 @@
   },
   "navGroupOthers": {
     "message": "Altro"
+  },
+  "kickLevelSummary": {
+    "message": "Livello Kick $1 · $2% verso il livello $3"
+  },
+  "kickLevelShort": {
+    "message": "Lv $1"
+  },
+  "kickLevelXp": {
+    "message": "$1 / $2 XP"
+  },
+  "kickStreakDays": {
+    "message": "Serie di $1 giorni di visione"
   }
 }

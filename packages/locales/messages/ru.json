@@ -47,6 +47,24 @@
   "languageTurkish": {
     "message": "Турецкий"
   },
+  "languageJapanese": {
+    "message": "Японский"
+  },
+  "languageIndonesian": {
+    "message": "Индонезийский"
+  },
+  "languagePolish": {
+    "message": "Польский"
+  },
+  "languageKorean": {
+    "message": "Корейский"
+  },
+  "languageUkrainian": {
+    "message": "Украинский"
+  },
+  "languageCzech": {
+    "message": "Чешский"
+  },
   "settingsLanguageTitle": {
     "message": "Язык"
   },
@@ -98,6 +116,9 @@
   "queueSkipped": {
     "message": "Пропущенные"
   },
+  "queueSkippedByFilter": {
+    "message": "$1 вне фильтра наград"
+  },
   "queueActionRequired": {
     "message": "Требуется действие"
   },
@@ -110,32 +131,20 @@
   "queueStrategyLabel": {
     "message": "Затем по"
   },
-  "queueFarmPinnedOnly": {
-    "message": "Фармить только закреплённые"
-  },
   "queueUnpinAll": {
     "message": "Открепить все ($1)"
   },
   "queueUnpin": {
     "message": "Открепить"
   },
-  "queueFacetLabel": {
-    "message": "Тип кампании"
-  },
-  "queueFacetAll": {
-    "message": "Все"
-  },
-  "queueFacetDrops": {
-    "message": "Дропы"
-  },
-  "queueFacetBadges": {
-    "message": "Значки подписки"
-  },
   "queueFixInclude": {
     "message": "Вернуть"
   },
   "queueFixPin": {
     "message": "Закрепить"
+  },
+  "queueFixFarmAll": {
+    "message": "Фармить все"
   },
   "queueFixGames": {
     "message": "Открыть игры"
@@ -146,8 +155,8 @@
   "queueEmpty": {
     "message": "Сейчас здесь нечего фармить."
   },
-  "queueEmptyBadges": {
-    "message": "Сейчас нет доступных кампаний по подписке."
+  "queueEmptyRewardTypes": {
+    "message": "Сейчас нечего фармить из выбранных типов."
   },
   "completedTabFinished": {
     "message": "Завершённые"
@@ -370,6 +379,18 @@
   },
   "subscriptionProgressUnknown": {
     "message": "Данные о прогрессе недоступны"
+  },
+  "rewardBadge": {
+    "message": "Значок"
+  },
+  "rewardBadgeNamed": {
+    "message": "Значок: $1"
+  },
+  "rewardAlsoWatch": {
+    "message": "И $1 просмотра"
+  },
+  "rewardClaimable": {
+    "message": "Можно забрать"
   },
   "notEarnableByWatching": {
     "message": "Нельзя получить за просмотр"
@@ -741,13 +762,10 @@
     "message": "Все награды этой кампании получены."
   },
   "campaignRejectionUnlinkedDisabled": {
-    "message": "Фарминг без привязанной учётной записи отключён."
+    "message": "Кампании без привязанного аккаунта переведены в режим «Пропускать»."
   },
   "campaignRejectionTwitchLinkRequired": {
     "message": "Для этой кампании Twitch требуется привязка учётной записи."
-  },
-  "campaignRejectionSubscriptionDisabled": {
-    "message": "Фарминг кампаний с подпиской отключён."
   },
   "campaignRejectionCategoryFiltered": {
     "message": "Эта кампания не соответствует выбранным категориям."
@@ -757,6 +775,18 @@
   },
   "campaignRejectionNotPinned": {
     "message": "Сейчас фармятся только закреплённые кампании."
+  },
+  "campaignRejectionRewardKind": {
+    "message": "Здесь нет наград выбранных типов ($1)."
+  },
+  "campaignRejectionSubscriptionSkipped": {
+    "message": "Её награды требуют подписку, а вы их пропускаете."
+  },
+  "campaignRejectionSubscriptionOnly": {
+    "message": "В ней нет наград за подписку, а вы фармите только их."
+  },
+  "campaignRejectionRewardTypesObtained": {
+    "message": "Её награды тех типов, что вы фармите, уже получены."
   },
   "campaignRejectionNoRewards": {
     "message": "В этой кампании нет доступных для фарминга наград."
@@ -902,17 +932,116 @@
   "activityLogLevelsDescription": {
     "message": "Выберите уровни для журнала активности. Ошибки всегда сохраняются."
   },
-  "farmUnlinkedTitle": {
-    "message": "Фармить кампании без привязанного аккаунта"
+  "rewardFilterTitle": {
+    "message": "Награды для фарма"
   },
-  "farmUnlinkedDescription": {
-    "message": "Когда выключено, кампании, требующие привязки аккаунта, пропускаются. Требования платформы могут всё равно требовать привязку, когда настройка включена."
+  "rewardFilterDescription": {
+    "message": "Что Lurkloot фармит на $1. Меню фильтра в очереди меняет ту же настройку."
   },
-  "farmSubscriptionTitle": {
-    "message": "Фармить кампании, требующие подписки"
+  "rewardKindsTitle": {
+    "message": "Типы наград"
   },
-  "farmSubscriptionDescription": {
-    "message": "Когда выключено, кампании, награды которых требуют подписки на канал, пропускаются."
+  "rewardKindsDescription": {
+    "message": "Награда фармится, если подходит хотя бы её часть."
+  },
+  "rewardKindItem": {
+    "message": "Внутриигровые предметы"
+  },
+  "rewardKindBadge": {
+    "message": "Значки"
+  },
+  "rewardKindEmote": {
+    "message": "Эмоуты"
+  },
+  "rewardKindItemShort": {
+    "message": "Предметы"
+  },
+  "subscriptionRewardsTitle": {
+    "message": "Награды за подписку"
+  },
+  "subscriptionRewardsDescription": {
+    "message": "Награды, для которых нужна подписка на канал."
+  },
+  "subscriptionModeInclude": {
+    "message": "Учитывать"
+  },
+  "subscriptionModeSkip": {
+    "message": "Пропускать"
+  },
+  "subscriptionModeOnly": {
+    "message": "Только"
+  },
+  "subscriptionModeIncludeHint": {
+    "message": "Награды за подписку фармятся вместе с остальными."
+  },
+  "subscriptionModeSkipHint": {
+    "message": "Награды, для которых нужна подписка, не фармятся."
+  },
+  "subscriptionModeOnlyHint": {
+    "message": "Фармятся только награды, для которых нужна подписка."
+  },
+  "unlinkedCampaignsTitle": {
+    "message": "Кампании без привязанного аккаунта"
+  },
+  "unlinkedCampaignsDescription": {
+    "message": "Фармить, пропускать или фармить последними кампании, требующие привязки игрового аккаунта. Требования платформы всё равно могут требовать привязку до получения награды."
+  },
+  "unlinkedModeInclude": {
+    "message": "Учитывать"
+  },
+  "unlinkedModeSkip": {
+    "message": "Пропускать"
+  },
+  "unlinkedModeLast": {
+    "message": "В конце"
+  },
+  "unlinkedModeIncludeHint": {
+    "message": "Фармятся вместе с остальными. Привяжите аккаунт, чтобы получить награды."
+  },
+  "unlinkedModeSkipHint": {
+    "message": "Никогда не фармятся, даже закреплённые."
+  },
+  "unlinkedModeLastHint": {
+    "message": "Фармятся, только когда ни одна кампания с привязанным аккаунтом не может фармиться. Закреплённые кампании и любимые игры сохраняют своё место."
+  },
+  "rewardFilterNoUnlinked": {
+    "message": "пропускать без привязки"
+  },
+  "rewardFilterUnlinkedLast": {
+    "message": "без привязки в конце"
+  },
+  "queueGroupUnlinked": {
+    "message": "Без привязки · фармятся последними"
+  },
+  "rankReasonUnlinked": {
+    "message": "Аккаунт не привязан"
+  },
+  "queueFixFarmLast": {
+    "message": "Фармить последними"
+  },
+  "rewardFilterAll": {
+    "message": "Все награды"
+  },
+  "rewardFilterAllKinds": {
+    "message": "Все"
+  },
+  "rewardFilterNoSub": {
+    "message": "без подп."
+  },
+  "rewardFilterSubOnly": {
+    "message": "только подп."
+  },
+  "rewardFilterPinnedOnly": {
+    "message": "только закреплённые"
+  },
+  "rewardFilterReset": {
+    "message": "Сбросить: все награды"
+  },
+  "farmPinnedOnlyTitle": {
+    "message": "Фармить только закреплённые кампании"
+  },
+  "farmPinnedOnlyDescription": {
+    "message": "На $1 фармятся только кампании, которые вы закрепили в очереди."
   },
   "forgetExcludedTitle": {
     "message": "Забыть исключённые кампании"
@@ -1853,12 +1982,6 @@
   "navWatchingNow": {
     "message": "Сейчас просматривается"
   },
-  "watchSourcePosition": {
-    "message": "$1 · $2 из $3"
-  },
-  "watchSourceChangeOrder": {
-    "message": "Изменить порядок просмотра"
-  },
   "gamesFavouritesGroup": {
     "message": "Избранное"
   },
@@ -1963,5 +2086,17 @@
   },
   "navGroupOthers": {
     "message": "Другое"
+  },
+  "kickLevelSummary": {
+    "message": "Уровень Kick $1 · $2% до уровня $3"
+  },
+  "kickLevelShort": {
+    "message": "Ур. $1"
+  },
+  "kickLevelXp": {
+    "message": "$1 / $2 XP"
+  },
+  "kickStreakDays": {
+    "message": "Серия просмотров: $1 дн."
   }
 }

@@ -4,6 +4,7 @@ import type {
   ChannelCheck,
   DropCampaign,
   DropReward,
+  KickAccountProgress,
   PlatformAuthHealth,
   WatchSession,
 } from "@lurkloot/shared/models";
@@ -38,6 +39,7 @@ import { type KickRealtimeConnection, kickRealtimePost } from "./realtime";
 import type { ChatPresenceClient } from "../../core/chatPresence";
 import type { ResolvedCompatibility } from "../../compatibility/types";
 import { createKickClaimCapability } from "./claim/factory";
+import { fetchKickAccountProgress } from "./accountProgress";
 import type { KickClaimCapability } from "./claim/types";
 import { safeHttpsUrl } from "./claim/types";
 import type { KickClaimState } from "./claim/v2";
@@ -831,6 +833,15 @@ export class KickAdapter implements PlatformAdapter {
     { signal }: AdapterOperationOptions = {},
   ): Promise<boolean> {
     if (!reward.claimId && reward.status !== "claimable") return false;
+    const suppressedUrl = this.claimCapability.suppressedUrl?.(campaign, reward);
+    if (suppressedUrl) {
+      // Already refused for want of a linked account, and already warned about.
+      // Re-stamp the guidance on the reward the caller holds, which may be a
+      // freshly refreshed copy, so its claim loop sees the refusal is explained
+      // and does not warn again on every tick (#779).
+      this.claimCapability.suppress?.(campaign, reward, suppressedUrl);
+      return false;
+    }
     if (this.claimCapability.isSuppressed?.(campaign, reward)) return false;
     // JSON.stringify drops `undefined`, so when no claim id was carried by
     // /drops/progress this matches the reference's `{ campaign_id, reward_id }`
@@ -863,6 +874,10 @@ export class KickAdapter implements PlatformAdapter {
       if (outcome.kind === "link_required") {
         this.claimCapability.suppress?.(campaign, reward, outcome.url);
         this.warnAccountNotLinked(campaign, reward, outcome.url);
+      } else {
+        // Guidance stored before a restart no longer explains this refusal;
+        // drop it so the claim loop reports it (#779).
+        reward.claimGuidance = undefined;
       }
       return false;
     } catch (error) {
@@ -933,6 +948,12 @@ export class KickAdapter implements PlatformAdapter {
       }
     }
     return claimed;
+  }
+
+  fetchAccountProgress({
+    signal,
+  }: AdapterOperationOptions = {}): Promise<KickAccountProgress | undefined> {
+    return fetchKickAccountProgress(this.fetcher, { signal, emit: this.emit });
   }
 
   private warnAccountNotLinked(

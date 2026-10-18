@@ -14,6 +14,8 @@ import type {
   SupportedLocale,
   TwitchPlatformSettings,
 } from "./models";
+import { defaultRewardFilter, normalizeRewardFilter } from "./rewardFilter";
+import { DEFAULT_UNLINKED_CAMPAIGN_MODE, normalizeUnlinkedCampaignMode } from "./unlinkedCampaigns";
 import {
   DEFAULT_WATCH_SOURCE_PRIORITY,
   normalizePlatformWatchSourcePriority,
@@ -22,6 +24,7 @@ import {
 const FARMING_PLATFORMS: Platform[] = ["twitch", "kick"];
 const AD_FOCUS_MODES: AdFocusMode[] = ["none", "tab", "window"];
 const PRIORITY_MODES: PriorityMode[] = ["ending_soonest", "lowest_availability"];
+
 const RATE_NUDGE_STATUSES: RateNudgeStatus[] = ["pending", "rated", "dismissed"];
 const GITHUB_STAR_NUDGE_STATUSES: GithubStarNudgeStatus[] = ["pending", "starred", "dismissed"];
 export const CATEGORY_MODES: CategoryMode[] = ["all", "include"];
@@ -37,11 +40,17 @@ export const SUPPORTED_LOCALES: SupportedLocale[] = [
   "pt_BR",
   "ar",
   "tr",
+  "ja",
+  "id",
+  "pl",
+  "ko",
+  "uk",
+  "cs",
 ];
 const LANGUAGE_OVERRIDES: LanguageOverride[] = ["browser", ...SUPPORTED_LOCALES];
 
 export type SettingsPatch = Partial<
-  Omit<ExtensionSettings, "platform" | "compatibility" | "farmingEligibility" | "twitchExtensions">
+  Omit<ExtensionSettings, "platform" | "compatibility" | "twitchExtensions">
 > & {
   twitchExtensions?: {
     nopixel?: Partial<ExtensionSettings["twitchExtensions"]["nopixel"]>;
@@ -55,7 +64,6 @@ export type SettingsPatch = Partial<
     twitch?: Partial<CompatibilitySettings["twitch"]>;
     kick?: Partial<CompatibilitySettings["kick"]>;
   };
-  farmingEligibility?: Partial<ExtensionSettings["farmingEligibility"]>;
 };
 
 // The engine-contract defaults: the universal subset every host shares.
@@ -80,6 +88,9 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
       idleWatchlistChannels: [],
       excludedChannels: [],
       categoryMode: "all",
+      rewardFilter: defaultRewardFilter("twitch"),
+      farmPinnedOnly: false,
+      unlinkedCampaigns: DEFAULT_UNLINKED_CAMPAIGN_MODE,
       categories: [],
       favouriteCategories: [],
       blockedCategories: [],
@@ -95,6 +106,9 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
       idleWatchlistChannels: [],
       excludedChannels: [],
       categoryMode: "all",
+      rewardFilter: defaultRewardFilter("kick"),
+      farmPinnedOnly: false,
+      unlinkedCampaigns: DEFAULT_UNLINKED_CAMPAIGN_MODE,
       categories: [],
       favouriteCategories: [],
       blockedCategories: [],
@@ -115,14 +129,7 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
     },
   },
   campaignPins: [],
-  farmPinnedOnly: false,
   excludedCampaignIds: [],
-  // Both classes are eligible by default: turning either off only ever farms
-  // less, so no existing user's farming changes on upgrade.
-  farmingEligibility: {
-    farmUnlinkedCampaigns: true,
-    farmSubscriptionCampaigns: true,
-  },
   offlineRetryLimit: 3,
   tablessFallbackFailureLimit: 5,
   pollIntervalMinutes: 1,
@@ -218,6 +225,12 @@ export function mergeEngineSettings(value: Partial<EngineSettings> | undefined):
         ),
         excludedChannels: normalizeChannelList(platform?.twitch?.excludedChannels),
         categoryMode: normalizeCategoryMode(platform?.twitch?.categoryMode),
+        rewardFilter: normalizeRewardFilter(platform?.twitch?.rewardFilter, "twitch"),
+        farmPinnedOnly: booleanOr(
+          platform?.twitch?.farmPinnedOnly,
+          DEFAULT_ENGINE_SETTINGS.platform.twitch.farmPinnedOnly,
+        ),
+        unlinkedCampaigns: normalizeUnlinkedCampaignMode(platform?.twitch?.unlinkedCampaigns),
         categories: normalizeCategorySelections(platform?.twitch?.categories),
         favouriteCategories: normalizeCategorySelections(platform?.twitch?.favouriteCategories),
         blockedCategories: normalizeCategorySelections(platform?.twitch?.blockedCategories),
@@ -249,6 +262,12 @@ export function mergeEngineSettings(value: Partial<EngineSettings> | undefined):
         ),
         excludedChannels: normalizeChannelList(platform?.kick?.excludedChannels),
         categoryMode: normalizeCategoryMode(platform?.kick?.categoryMode),
+        rewardFilter: normalizeRewardFilter(platform?.kick?.rewardFilter, "kick"),
+        farmPinnedOnly: booleanOr(
+          platform?.kick?.farmPinnedOnly,
+          DEFAULT_ENGINE_SETTINGS.platform.kick.farmPinnedOnly,
+        ),
+        unlinkedCampaigns: normalizeUnlinkedCampaignMode(platform?.kick?.unlinkedCampaigns),
         categories: normalizeCategorySelections(platform?.kick?.categories),
         favouriteCategories: normalizeCategorySelections(platform?.kick?.favouriteCategories),
         blockedCategories: normalizeCategorySelections(platform?.kick?.blockedCategories),
@@ -274,9 +293,7 @@ export function mergeEngineSettings(value: Partial<EngineSettings> | undefined):
       },
     },
     campaignPins: normalizeIdList(value?.campaignPins),
-    farmPinnedOnly: booleanOr(value?.farmPinnedOnly, DEFAULT_ENGINE_SETTINGS.farmPinnedOnly),
     excludedCampaignIds: normalizeIdList(value?.excludedCampaignIds),
-    farmingEligibility: normalizeFarmingEligibility(value?.farmingEligibility),
     offlineRetryLimit: clampInteger(
       value?.offlineRetryLimit,
       1,
@@ -411,10 +428,6 @@ export function applySettingsPatch(
         ...patch.compatibility?.kick,
       },
     },
-    farmingEligibility: {
-      ...current.farmingEligibility,
-      ...patch.farmingEligibility,
-    },
   });
 }
 
@@ -515,23 +528,6 @@ export function normalizeSubscriptionMarks(value: string[] | undefined): string[
     const separator = item.indexOf(":");
     return separator > 0 && separator < item.length - 1;
   });
-}
-
-// Exported for non-extension hosts (the CLI) that honour farmingEligibility on
-// their own settings surface but must default identically to the engine.
-export function normalizeFarmingEligibility(
-  value: Partial<EngineSettings["farmingEligibility"]> | undefined,
-): EngineSettings["farmingEligibility"] {
-  return {
-    farmUnlinkedCampaigns: booleanOr(
-      value?.farmUnlinkedCampaigns,
-      DEFAULT_ENGINE_SETTINGS.farmingEligibility.farmUnlinkedCampaigns,
-    ),
-    farmSubscriptionCampaigns: booleanOr(
-      value?.farmSubscriptionCampaigns,
-      DEFAULT_ENGINE_SETTINGS.farmingEligibility.farmSubscriptionCampaigns,
-    ),
-  };
 }
 
 // The Idle Watchlist's cap. The popup printed "n/20" long before anything

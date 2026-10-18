@@ -2,46 +2,43 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
 import { AnimatePresence } from "motion/react";
 import { ChevronRight, Clock3, Pin } from "lucide-react";
-import type { CategorySelection, PriorityMode } from "@lurkloot/shared/models";
-import { useT } from "./context";
+import type {
+  CategorySelection,
+  Platform,
+  PriorityMode,
+  RewardFilter,
+  RewardKind,
+  UnlinkedCampaignMode,
+} from "@lurkloot/shared/models";
+import { defaultRewardFilter, isRewardFilterNarrowed } from "@lurkloot/shared/rewardFilter";
+import { I18nContext, useT } from "./context";
 import { filterCampaigns } from "./campaignSearch";
 import {
   CampaignCard,
   SortableCampaign,
-  campaignRejectionMessageKey,
+  campaignRejectionMessage,
   initialExpandedIds,
 } from "./drops";
 import { fallbackGame } from "./viewModels";
 import type { CampaignRankTier } from "./viewModels";
 import type { CampaignView, GameItem } from "./types";
-import { ViewToolbar } from "./viewToolbar";
 import {
   EmptyPanel,
   SearchBox,
-  Toggle,
   cn,
   reorderFromDragEnd,
   scrollIntoPanel,
   type SortableDragEndEvent,
 } from "./primitives";
 import { Dropdown } from "./dropdown";
-import { Segmented } from "./controls";
-
-// Which campaigns a facet admits. The facet reads across the queue AND the
-// skipped group on purpose: with subscription campaigns turned off, "Sub badges"
-// would otherwise look empty while those campaigns sat one group below.
-export type QueueFacet = "all" | "drops" | "badges";
+import { RewardFilterMenu } from "./rewardFilterMenu";
 
 const TIER_LABEL_KEYS: Record<CampaignRankTier, string> = {
   pinned: "queueGroupPinned",
   favourite: "queueGroupFavourite",
   strategy: "queueGroupStrategy",
+  unlinked: "queueGroupUnlinked",
 };
-
-function matchesFacet(campaign: CampaignView, facet: QueueFacet): boolean {
-  if (facet === "all") return true;
-  return facet === "badges" ? campaign.hasSubscriptionRewards : !campaign.hasSubscriptionRewards;
-}
 
 // Only pins have a hand-made order. Everything below them is ranked by the
 // favourite games' order and then the strategy, so it is neither draggable nor
@@ -51,7 +48,7 @@ const pinnedOf = (queued: CampaignView[]): CampaignView[] =>
   queued.filter((campaign) => campaign.rankTier === "pinned");
 
 // Where a pin moved to slot `toIndex` of the visible pins goes in the full pin
-// list: it takes the place of the pin now in that slot. A facet can hide some
+// list: it takes the place of the pin now in that slot. A campaign type can skip some
 // pins, so the visible slot and the real position are not the same number.
 function pinPosition(visiblePins: CampaignView[], toIndex: number): number {
   const displaced = visiblePins[Math.max(0, Math.min(toIndex, visiblePins.length - 1))];
@@ -66,9 +63,16 @@ export function QueuePanel({
   strategy,
   pinnedCount,
   farmPinnedOnly,
+  unlinkedCampaigns,
+  platform,
+  rewardFilter: liveRewardFilter,
+  rewardKindCounts,
+  showSubscriptionChoice,
+  onRewardFilterChange,
   onStrategyChange,
   onUnpinAll,
   onFarmPinnedOnlyChange,
+  onUnlinkedCampaignsChange,
   onRefreshCampaign,
   onPinChange,
   onToggleExclude,
@@ -84,20 +88,36 @@ export function QueuePanel({
   strategy: PriorityMode;
   pinnedCount: number;
   farmPinnedOnly: boolean;
+  unlinkedCampaigns: UnlinkedCampaignMode;
+  // The platform the queue lists; its reward filter is the toolbar's menu.
+  platform: Platform;
+  rewardFilter: RewardFilter;
+  // How many campaigns each kind alone would queue (viewModels' rewardKindCounts).
+  rewardKindCounts?: Partial<Record<RewardKind, number>>;
+  // Whether the menu asks about subscription rewards (showsSubscriptionChoice).
+  showSubscriptionChoice: boolean;
+  onRewardFilterChange(filter: RewardFilter): void | Promise<void>;
   onStrategyChange(strategy: PriorityMode): void | Promise<void>;
   onUnpinAll(): void | Promise<void>;
   onFarmPinnedOnlyChange(value: boolean): void | Promise<void>;
+  onUnlinkedCampaignsChange(value: UnlinkedCampaignMode): void | Promise<void>;
   onRefreshCampaign(id: string): void | Promise<void>;
   onPinChange(campaignId: string, position: number | null): void | Promise<void>;
   onToggleExclude(id: string): void | Promise<void>;
   onToggleFavouriteCategory?(category: CategorySelection): void | Promise<void>;
   onToggleBlockedCategory?(category: CategorySelection): void | Promise<void>;
   onOpenGames(): void;
-  onOpenSettings(): void;
+  // Opens Settings, scrolled to a group when one is named.
+  onOpenSettings(groupId?: string): void;
 }): React.ReactElement {
   const t = useT();
+  const { locale } = React.useContext(I18nContext);
+  // Rows are memoised on their props, and a poll can hand over an equal filter
+  // as a new object: keep the same one while its contents are unchanged.
+  const kindsKey = liveRewardFilter.kinds.join(",");
+  const rewardFilter = useMemo(() => liveRewardFilter, [kindsKey, liveRewardFilter.subscriptions]);
+  const rewardFilterNarrowed = isRewardFilterNarrowed(rewardFilter, platform);
   const [query, setQuery] = useState("");
-  const [facet, setFacet] = useState<QueueFacet>("all");
   const [showSkipped, setShowSkipped] = useState(false);
   const [showActionRequired, setShowActionRequired] = useState(false);
   const [showUpcoming, setShowUpcoming] = useState(false);
@@ -107,16 +127,7 @@ export function QueuePanel({
   const listRef = useRef<HTMLDivElement>(null);
   const searching = query.trim().length > 0;
 
-  const inFacet = useMemo(
-    () => campaigns.filter((campaign) => matchesFacet(campaign, facet)),
-    [campaigns, facet],
-  );
   const queued = useMemo(
-    () => inFacet.filter((campaign) => campaign.section === "queue"),
-    [inFacet],
-  );
-  // Search reads across every facet, so its ranks come from the whole queue.
-  const allQueued = useMemo(
     () => campaigns.filter((campaign) => campaign.section === "queue"),
     [campaigns],
   );
@@ -124,17 +135,22 @@ export function QueuePanel({
   // user, outside it.
   const skipped = useMemo(
     () =>
-      inFacet.filter((campaign) => campaign.section === "skipped" && !campaign.needsOutsideAction),
-    [inFacet],
+      campaigns.filter(
+        (campaign) => campaign.section === "skipped" && !campaign.needsOutsideAction,
+      ),
+    [campaigns],
   );
+  const filteredCount = skipped.filter(
+    (campaign) => campaign.farmingRejection?.code === "reward_type_filtered",
+  ).length;
   const actionRequired = useMemo(
     () =>
-      inFacet.filter((campaign) => campaign.section === "skipped" && campaign.needsOutsideAction),
-    [inFacet],
+      campaigns.filter((campaign) => campaign.section === "skipped" && campaign.needsOutsideAction),
+    [campaigns],
   );
   const upcoming = useMemo(
-    () => inFacet.filter((campaign) => campaign.section === "upcoming"),
-    [inFacet],
+    () => campaigns.filter((campaign) => campaign.section === "upcoming"),
+    [campaigns],
   );
   const searchResults = useMemo(
     () => filterCampaigns(campaigns, gameMap, query),
@@ -160,7 +176,6 @@ export function QueuePanel({
     if (!focus) return;
     setQuery("");
     const target = campaigns.find((campaign) => campaign.id === focus.id);
-    if (target && !matchesFacet(target, facet)) setFacet("all");
     if (target?.section === "skipped") {
       if (target.needsOutsideAction) setShowActionRequired(true);
       else setShowSkipped(true);
@@ -193,6 +208,9 @@ export function QueuePanel({
     onToggleBlockedCategory,
     onOpenGames,
     onOpenSettings,
+    platform,
+    onRewardFilterChange,
+    onUnlinkedCampaignsChange,
   });
   latest.current = {
     queued,
@@ -204,6 +222,9 @@ export function QueuePanel({
     onToggleBlockedCategory,
     onOpenGames,
     onOpenSettings,
+    platform,
+    onRewardFilterChange,
+    onUnlinkedCampaignsChange,
   };
   const actions = useMemo<RowActions>(
     () => ({
@@ -221,12 +242,15 @@ export function QueuePanel({
         if (pins.some((campaign) => campaign.id === id))
           void latest.current.onPinChange(id, pinPosition(pins, toIndex));
       },
-      // A search result's rank is its place among all pins, whatever the facet.
+      // A search result's rank is its place among all pins.
       pinAt: (id, position) => void latest.current.onPinChange(id, position),
       favourite: (category) => void latest.current.onToggleFavouriteCategory?.(category),
       block: (category) => void latest.current.onToggleBlockedCategory?.(category),
       openGames: () => latest.current.onOpenGames(),
       openSettings: () => latest.current.onOpenSettings(),
+      farmUnlinkedLast: () => void latest.current.onUnlinkedCampaignsChange("last"),
+      farmAll: () =>
+        void latest.current.onRewardFilterChange(defaultRewardFilter(latest.current.platform)),
     }),
     [],
   );
@@ -253,17 +277,12 @@ export function QueuePanel({
     { value: "lowest_availability", label: t("lowAvailabilityFirst") },
   ];
 
-  const tiers: CampaignRankTier[] = ["pinned", "favourite", "strategy"];
-  const facetCounts: Record<QueueFacet, number> = {
-    all: campaigns.filter((campaign) => campaign.section === "queue").length,
-    drops: campaigns.filter(
-      (campaign) => campaign.section === "queue" && matchesFacet(campaign, "drops"),
-    ).length,
-    badges: campaigns.filter(
-      (campaign) => campaign.section === "queue" && matchesFacet(campaign, "badges"),
-    ).length,
-  };
-
+  const tiers: CampaignRankTier[] = ["pinned", "favourite", "strategy", "unlinked"];
+  // The strategy orders the unlinked group too, so when no row sits under
+  // "Then by" its picker moves to the unlinked divider instead of vanishing.
+  const strategyTier: CampaignRankTier = queued.some((campaign) => campaign.rankTier === "strategy")
+    ? "strategy"
+    : "unlinked";
   // The layer of the ranking that placed a queued campaign, in words: the
   // card shows it among its facts so the order never has to be guessed.
   function rankReason(campaign: CampaignView): string {
@@ -275,15 +294,16 @@ export function QueuePanel({
         String(campaign.favouriteIndex + 1),
       ]);
     }
-    return t(strategy === "lowest_availability" ? "rankReasonAvailability" : "rankReasonEnding");
+    const byStrategy = t(
+      strategy === "lowest_availability" ? "rankReasonAvailability" : "rankReasonEnding",
+    );
+    return campaign.rankTier === "unlinked"
+      ? `${t("rankReasonUnlinked")} · ${byStrategy}`
+      : byStrategy;
   }
 
   return (
     <section className="space-y-1.5">
-      <ViewToolbar>
-        <FacetTabs facet={facet} counts={facetCounts} onChange={setFacet} />
-      </ViewToolbar>
-
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <SearchBox
@@ -293,18 +313,17 @@ export function QueuePanel({
             placeholder={t("campaignSearchPlaceholder")}
           />
         </div>
-        <label
-          data-queue-pinned-only
-          className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-zinc-600 dark:text-zinc-300"
-        >
-          <Toggle
-            size="sm"
-            checked={farmPinnedOnly}
-            onChange={(value) => void onFarmPinnedOnlyChange(value)}
-            label={t("queueFarmPinnedOnly")}
-          />
-          <span aria-hidden>{t("queueFarmPinnedOnly")}</span>
-        </label>
+        <RewardFilterMenu
+          platform={platform}
+          filter={rewardFilter}
+          showSubscriptions={showSubscriptionChoice}
+          counts={rewardKindCounts}
+          farmPinnedOnly={farmPinnedOnly}
+          unlinkedCampaigns={unlinkedCampaigns}
+          onChange={(filter) => void onRewardFilterChange(filter)}
+          onFarmPinnedOnlyChange={(value) => void onFarmPinnedOnlyChange(value)}
+          onUnlinkedCampaignsChange={(value) => void onUnlinkedCampaignsChange(value)}
+        />
       </div>
 
       {campaigns.length === 0 ? (
@@ -317,7 +336,7 @@ export function QueuePanel({
         ) : (
           <div data-queue-group="search" className="space-y-1">
             {searchResults.map((campaign, index) => {
-              const queueIndex = allQueued.findIndex((entry) => entry.id === campaign.id);
+              const queueIndex = queued.findIndex((entry) => entry.id === campaign.id);
               return (
                 <div
                   key={campaign.id}
@@ -344,6 +363,7 @@ export function QueuePanel({
                     rankCount={pinnedCount}
                     rankReason={campaign.section === "queue" ? rankReason(campaign) : undefined}
                     actions={actions}
+                    rewardFilter={rewardFilter}
                     {...categoryActions}
                   />
                 </div>
@@ -362,7 +382,7 @@ export function QueuePanel({
                 <GroupDivider
                   label={t(TIER_LABEL_KEYS[tier])}
                   hint={
-                    tier === "strategy" ? (
+                    tier === strategyTier ? (
                       // The strategy lives where it acts: it ranks exactly
                       // the rows under this divider, so the divider's hint is
                       // the picker and reads "Then by <mode>".
@@ -404,6 +424,7 @@ export function QueuePanel({
                     rankCount={rows.length}
                     rankReason={rankReason(campaign)}
                     actions={actions}
+                    rewardFilter={rewardFilter}
                     {...categoryActions}
                   />
                 ))}
@@ -422,7 +443,9 @@ export function QueuePanel({
           })}
 
           {queued.length === 0 ? (
-            <EmptyPanel>{t(facet === "badges" ? "queueEmptyBadges" : "queueEmpty")}</EmptyPanel>
+            <EmptyPanel>
+              {t(rewardFilterNarrowed ? "queueEmptyRewardTypes" : "queueEmpty")}
+            </EmptyPanel>
           ) : null}
 
           {skipped.length > 0 || actionRequired.length > 0 || upcoming.length > 0 ? (
@@ -450,6 +473,7 @@ export function QueuePanel({
                     expanded={Boolean(expandedIds[campaign.id])}
                     refreshing={refreshing}
                     actions={actions}
+                    rewardFilter={rewardFilter}
                     {...categoryActions}
                   />
                 </div>
@@ -462,20 +486,24 @@ export function QueuePanel({
               group="skipped"
               label={t("queueSkipped")}
               count={skipped.length}
-              hint={[
-                ...new Set(
-                  skipped.map((campaign) => {
-                    const rejection = campaign.farmingRejection;
-                    return (
-                      rejection
-                      && t(campaignRejectionMessageKey(rejection.code), rejection.rewardName)
-                    );
-                  }),
-                ),
-              ]
-                .filter(Boolean)
-                .slice(0, 2)
-                .join(" · ")}
+              hint={
+                filteredCount > 0
+                  ? t("queueSkippedByFilter", String(filteredCount))
+                  : [
+                      ...new Set(
+                        skipped.map((campaign) => {
+                          const rejection = campaign.farmingRejection;
+                          return (
+                            rejection
+                            && campaignRejectionMessage(rejection, rewardFilter, t, locale)
+                          );
+                        }),
+                      ),
+                    ]
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .join(" · ")
+              }
               expanded={showSkipped}
               onToggle={() => setShowSkipped((current) => !current)}
             >
@@ -491,6 +519,7 @@ export function QueuePanel({
                     expanded={Boolean(expandedIds[campaign.id])}
                     refreshing={refreshing}
                     actions={actions}
+                    rewardFilter={rewardFilter}
                     {...categoryActions}
                   />
                 </div>
@@ -518,6 +547,7 @@ export function QueuePanel({
                     expanded={Boolean(expandedIds[campaign.id])}
                     refreshing={refreshing}
                     actions={actions}
+                    rewardFilter={rewardFilter}
                     {...categoryActions}
                   />
                 </div>
@@ -542,6 +572,8 @@ type RowActions = {
   block(category: CategorySelection): void;
   openGames(): void;
   openSettings(): void;
+  farmUnlinkedLast(): void;
+  farmAll(): void;
 };
 
 /** One campaign row in the queue, in whichever group it sits. Memoised: its
@@ -562,6 +594,7 @@ const QueueRow = React.memo(function QueueRow({
   actions,
   canFavourite,
   canBlock,
+  rewardFilter,
 }: {
   kind: "search" | "sortable" | "ranked" | "skipped" | "upcoming";
   campaign: CampaignView;
@@ -576,6 +609,7 @@ const QueueRow = React.memo(function QueueRow({
   actions: RowActions;
   canFavourite: boolean;
   canBlock: boolean;
+  rewardFilter: RewardFilter;
 }): React.ReactElement {
   const t = useT();
   const queued = campaign.section === "queue";
@@ -592,6 +626,7 @@ const QueueRow = React.memo(function QueueRow({
     onToggleExclude: actions.toggleExclude,
     onToggleFavouriteCategory: canFavourite ? actions.favourite : undefined,
     onToggleBlockedCategory: canBlock ? actions.block : undefined,
+    rewardFilter,
   };
   if (kind === "sortable") {
     return (
@@ -634,6 +669,8 @@ const QueueRow = React.memo(function QueueRow({
                   onToggleExclude: actions.toggleExclude,
                   onOpenGames: actions.openGames,
                   onOpenSettings: actions.openSettings,
+                  onFarmUnlinkedLast: actions.farmUnlinkedLast,
+                  onFarmAll: actions.farmAll,
                   onPin: () => actions.pinLast(campaign.id),
                 },
                 t,
@@ -662,6 +699,8 @@ const QueueRow = React.memo(function QueueRow({
             onToggleExclude: actions.toggleExclude,
             onOpenGames: actions.openGames,
             onOpenSettings: actions.openSettings,
+            onFarmUnlinkedLast: actions.farmUnlinkedLast,
+            onFarmAll: actions.farmAll,
             onPin: () => actions.pinLast(campaign.id),
           },
           t,
@@ -681,6 +720,8 @@ function skippedFix(
     onToggleExclude(id: string): void | Promise<void>;
     onOpenGames(): void;
     onOpenSettings(): void;
+    onFarmUnlinkedLast(): void;
+    onFarmAll(): void;
     onPin(): void;
   },
   t: (key: string, substitutions?: string | string[]) => string,
@@ -693,46 +734,16 @@ function skippedFix(
       onClick: () => void handlers.onToggleExclude(campaign.id),
     };
   if (code === "not_pinned") return { label: t("queueFixPin"), onClick: handlers.onPin };
+  if (code === "reward_type_filtered" || code === "reward_types_obtained")
+    return { label: t("queueFixFarmAll"), onClick: handlers.onFarmAll };
   if (code === "category_blocked" || code === "category_filtered")
     return { label: t("queueFixGames"), onClick: handlers.onOpenGames };
-  if (
-    code === "unlinked_campaigns_disabled"
-    || code === "subscription_campaigns_disabled"
-    || code === "insufficient_time"
-  ) {
+  // "Farm last" queues it without moving it ahead of the linked campaigns.
+  if (code === "unlinked_campaigns_disabled")
+    return { label: t("queueFixFarmLast"), onClick: handlers.onFarmUnlinkedLast };
+  if (code === "insufficient_time")
     return { label: t("queueFixSettings"), onClick: handlers.onOpenSettings };
-  }
   return undefined;
-}
-
-function FacetTabs({
-  facet,
-  counts,
-  onChange,
-}: {
-  facet: QueueFacet;
-  counts: Record<QueueFacet, number>;
-  onChange(facet: QueueFacet): void;
-}): React.ReactElement {
-  const t = useT();
-  const options: Array<[QueueFacet, string]> = [
-    ["all", "queueFacetAll"],
-    ["drops", "queueFacetDrops"],
-    ["badges", "queueFacetBadges"],
-  ];
-  return (
-    <Segmented
-      label={t("queueFacetLabel")}
-      value={facet}
-      itemAttribute="data-queue-facet"
-      options={options.map(([value, labelKey]) => ({
-        value,
-        label: t(labelKey),
-        count: counts[value],
-      }))}
-      onChange={onChange}
-    />
-  );
 }
 
 // A group's label. Each divider names the layer that placed the rows under it,

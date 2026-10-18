@@ -19,8 +19,10 @@ import type {
 } from "@lurkloot/shared/models";
 import { campaignPassesCategoryFilter } from "@lurkloot/shared/categories";
 import { pinIndex, rankCampaigns } from "@lurkloot/shared/ranking";
+import { campaignFilterMiss } from "@lurkloot/shared/rewardFilter";
 import {
   evaluateCampaignFarming,
+  rewardsInFarmingScope,
   type CampaignFarmingEvaluation,
   type CampaignFarmingRejectionCode,
 } from "@lurkloot/shared/campaignFarming";
@@ -29,6 +31,7 @@ import {
   campaignPassesFarmingEligibility,
   hasCampaignEnded,
 } from "@lurkloot/shared/campaignFilters";
+import { isCampaignUnlinked } from "@lurkloot/shared/unlinkedCampaigns";
 import {
   applySubscriptionMarks,
   canClaimReward,
@@ -91,7 +94,10 @@ export function challengePollDue(state: SchedulerState, platform: Platform, now:
 }
 
 function activeReward(campaign: DropCampaign, settings: EngineSettings): DropReward | undefined {
-  const earnable = campaign.rewards.filter(
+  const earnable = rewardsInFarmingScope(
+    campaign,
+    settings.platform[campaign.platform].rewardFilter,
+  ).filter(
     (reward) =>
       reward.preconditionsMet !== false
       && isRewardAvailableToEarn(reward)
@@ -140,7 +146,8 @@ function isEligible(campaign: DropCampaign, settings: EngineSettings): boolean {
   // part of campaignFarmable — an unpinned campaign must stay farmable-shaped
   // for display so the popup can still offer the pin.
   if (!campaignFarmable(campaign, settings)) return false;
-  if (settings.farmPinnedOnly && !isPinned(campaign, settings)) return false;
+  if (settings.platform[campaign.platform].farmPinnedOnly && !isPinned(campaign, settings))
+    return false;
   return true;
 }
 
@@ -474,23 +481,19 @@ function noEligibleCampaignReason(campaigns: DropCampaign[], settings: EngineSet
   ) {
     return "Campaigns have no time-based rewards";
   }
-  // Placed before the account-linked reason so a user who turned
-  // farmUnlinkedCampaigns off is told about their eligibility setting rather
-  // than about the link state that setting keys off. With the flag on, unlinked
+  // Placed before the account-linked reason so a user who set
+  // unlinkedCampaigns to "skip" is told about their eligibility setting rather
+  // than about the link state that setting keys off. Otherwise unlinked
   // campaigns pass this predicate and the more specific reason below still wins.
   if (
     notExcluded.every(
-      (campaign) => !campaignPassesFarmingEligibility(campaign, settings.farmingEligibility),
+      (campaign) =>
+        !campaignPassesFarmingEligibility(campaign, settings.platform[campaign.platform]),
     )
   ) {
     return "All campaigns are skipped by your farming eligibility settings";
   }
-  if (
-    notExcluded.every(
-      (campaign) =>
-        campaign.accountLinked === false || campaign.eligibility === "account_not_linked",
-    )
-  ) {
+  if (notExcluded.every((campaign) => isCampaignUnlinked(campaign))) {
     return "Campaign accounts are not linked";
   }
   if (
@@ -500,12 +503,22 @@ function noEligibleCampaignReason(campaigns: DropCampaign[], settings: EngineSet
   ) {
     return "No campaigns match the categories filter";
   }
+  if (
+    notExcluded.every(
+      (campaign) =>
+        campaignFilterMiss(campaign, settings.platform[campaign.platform].rewardFilter)
+        !== undefined,
+    )
+  ) {
+    return "No campaigns have rewards your reward filter allows";
+  }
   // Eligible, not merely pinned: with pins that have all expired, "no pinned
   // campaigns are eligible" is the accurate and more actionable reason.
   if (
-    settings.farmPinnedOnly
-    && !notExcluded.some(
-      (campaign) => isPinned(campaign, settings) && campaignFarmable(campaign, settings),
+    notExcluded.every(
+      (campaign) =>
+        settings.platform[campaign.platform].farmPinnedOnly
+        && !(isPinned(campaign, settings) && campaignFarmable(campaign, settings)),
     )
   ) {
     return "No pinned campaigns are eligible";
@@ -968,11 +981,9 @@ export function campaignSearchFingerprint(
     campaign,
     settings: {
       campaignPins: settings.campaignPins,
-      farmPinnedOnly: settings.farmPinnedOnly,
       excludedCampaignIds: settings.excludedCampaignIds,
       priorityMode: settings.priorityMode,
-      farmingEligibility: settings.farmingEligibility,
-      platform: settings.platform.twitch,
+      platform: settings.platform[campaign.platform],
     },
   });
 }
@@ -1303,10 +1314,11 @@ const CAMPAIGN_REJECTION_LABELS: Record<CampaignFarmingRejectionCode, string> = 
   completed: "completed",
   unlinked_campaigns_disabled: "unlinked campaigns disabled",
   twitch_link_required: "Twitch account linking required",
-  subscription_campaigns_disabled: "subscription campaigns disabled",
   category_filtered: "category filtered",
   category_blocked: "game blocked",
   not_pinned: "not pinned",
+  reward_type_filtered: "no reward of the types being farmed",
+  reward_types_obtained: "rewards of the types being farmed already earned",
   no_rewards: "no rewards",
   no_unclaimed_rewards: "no unclaimed rewards",
   reward_prerequisites_unmet: "reward prerequisites unmet",

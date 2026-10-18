@@ -1,6 +1,12 @@
 import { campaignPassesCategoryFilter } from "./categories";
 import { evaluateCampaignFarming } from "./campaignFarming";
-import type { CampaignFilterKey, DropCampaign, DropReward, EngineSettings } from "./models";
+import type {
+  CampaignFilterKey,
+  DropCampaign,
+  DropReward,
+  EngineSettings,
+  PlatformSettings,
+} from "./models";
 import {
   campaignHasSubscriptionRewards,
   canClaimReward,
@@ -8,6 +14,7 @@ import {
   isRewardObtained,
   isRewardRelevantNow,
 } from "./rewards";
+import { isCampaignUnlinked } from "./unlinkedCampaigns";
 
 export function isCampaignExpired(campaign: DropCampaign): boolean {
   if (campaign.status === "expired") return true;
@@ -59,21 +66,14 @@ export function campaignFilterCategories(
 }
 
 // What the engine asks: is this campaign's class allowed to be farmed? Reads
-// only the two eligibility flags; excludedCampaignIds is handled separately in
-// isEligible, so it is not consulted here. Threading exclusions through would
-// imply this filter has an opinion about them.
+// only the platform's unlinked-campaigns mode ("last" still farms); excludedCampaignIds is handled
+// separately in isEligible, so it is not consulted here. Threading exclusions
+// through would imply this filter has an opinion about them.
 export function campaignPassesFarmingEligibility(
   campaign: DropCampaign,
-  farmingEligibility: EngineSettings["farmingEligibility"],
+  platformSettings: Pick<PlatformSettings, "unlinkedCampaigns">,
 ): boolean {
-  if (
-    (campaign.accountLinked === false || campaign.eligibility === "account_not_linked")
-    && !farmingEligibility.farmUnlinkedCampaigns
-  )
-    return false;
-  if (campaignHasSubscriptionRewards(campaign) && !farmingEligibility.farmSubscriptionCampaigns)
-    return false;
-  return true;
+  return !(isCampaignUnlinked(campaign) && platformSettings.unlinkedCampaigns === "skip");
 }
 
 // Whether a single reward is farmable right now: not yet claimed, its earn/claim
@@ -121,7 +121,8 @@ export function campaignEligibleClass(campaign: DropCampaign, settings: EngineSe
   )
     return false;
   if (settings.excludedCampaignIds.includes(campaign.id)) return false;
-  if (!campaignPassesFarmingEligibility(campaign, settings.farmingEligibility)) return false;
+  if (!campaignPassesFarmingEligibility(campaign, settings.platform[campaign.platform]))
+    return false;
   if (!campaignPassesCategoryFilter(campaign, settings.platform[campaign.platform])) return false;
   // Linking is required for game delivery; the farming flag controls watch eligibility.
   return campaign.rewards.some((reward) => reward.status !== "claimed");
