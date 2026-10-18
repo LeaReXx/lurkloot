@@ -1,4 +1,5 @@
-import { localeConfig } from "./store-screenshot-config.mjs";
+import { describeLocale } from "./locales.mjs";
+import { sanitizeInPage } from "./snapshot.mjs";
 
 export const SECTIONS = Object.freeze({ localized: "localized", global: "global" });
 
@@ -33,6 +34,21 @@ async function requireUnique(locator, description) {
 function localeNamePattern(locale) {
   const dashboardCode = locale.code.replace(/_/g, "-").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`[\\u2013\\u2014-]\\s*${dashboardCode}(?:\\s*\\(default\\))?\\s*$`, "i");
+}
+
+// A dashboard thumbnail is served from a path whose leading segment names the
+// image and whose "=" suffix only sizes it, so the segment identifies an upload
+// across reloads. Anything that is not a hosted image identifies itself.
+export function thumbnailId(src) {
+  if (!src) return "";
+  let url;
+  try {
+    url = new URL(src);
+  } catch {
+    return src;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return src;
+  return (url.pathname.split("/").pop() ?? "").split("=")[0];
 }
 
 export class ChromeWebStoreDashboard {
@@ -185,6 +201,62 @@ export class ChromeWebStoreDashboard {
     await listingHeading.first().waitFor({ state: "visible", timeout: this.timeout });
   }
 
+  // Reloads the listing from the server. The page keeps its own copy of what it
+  // has edited, so only a fresh load shows what the dashboard really stored.
+  async reload() {
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+    await this.page
+      .getByRole("heading", { name: LABELS.storeListing })
+      .first()
+      .waitFor({ state: "visible", timeout: this.timeout });
+    await this.languageControl().first().waitFor({ state: "visible", timeout: this.timeout });
+  }
+
+  // The sanitized structure of the page as it is right now. It only reads, and
+  // it leaves menus alone, so the capture is of a settled page.
+  async snapshotHtml() {
+    // Right after a language switch a menu stays open for a moment, and a
+    // snapshot of that would record a page in a state nobody works in.
+    await this.page.waitForFunction(
+      () => {
+        return (
+          document.querySelector("textarea") !== null
+          && document.querySelector('[role="combobox"][aria-expanded="true"]') === null
+        );
+      },
+      undefined,
+      { timeout: this.timeout },
+    );
+    return this.page.evaluate(sanitizeInPage);
+  }
+
+  async thumbnailIds(section = SECTIONS.localized) {
+    const sources = await this.screenshotItems(section).evaluateAll((media) =>
+      media.map((image) => image.currentSrc || image.getAttribute("src") || ""),
+    );
+    return sources.map(thumbnailId);
+  }
+
+  // Everything the dashboard currently holds for one language, plus the shared
+  // screenshots, read without changing anything.
+  async readLocaleState(code) {
+    await this.selectLocale(code);
+    const language = await requireUnique(this.languageControl(), "listing language selector");
+    const description = this.descriptionControl();
+    return {
+      locale: code,
+      language: await this.selectedLocaleName(
+        language,
+        await language.evaluate((el) => el.tagName),
+      ),
+      description: (await description.count()) === 1 ? await description.inputValue() : "",
+      packageTitle: await this.packageText(LABELS.packageTitle),
+      packageSummary: await this.packageText(LABELS.packageSummary),
+      localized: await this.thumbnailIds(SECTIONS.localized),
+      global: await this.thumbnailIds(SECTIONS.global),
+    };
+  }
+
   // The menu paints its options asynchronously, so counting straight after the
   // click races the dashboard and reports zero matches for every locale.
   async openLanguageMenu(language) {
@@ -196,6 +268,31 @@ export class ChromeWebStoreDashboard {
       .waitFor({ state: "visible", timeout: this.timeout });
   }
 
+  // "Draft", "Pending review", "Published" and so on, as the page words it. A
+  // submitted item cannot be edited until its review ends, so the status is
+  // what explains a form that will not take changes.
+  async listingStatus() {
+    const status = this.page.getByText(/^\s*Status:\s*\S/);
+    if ((await status.count()) === 0) return "";
+    return ((await status.first().textContent()) ?? "").replace(/^\s*Status:\s*/, "").trim();
+  }
+
+  // The form is briefly disabled while it loads, so it is only called locked
+  // after it stays disabled for the whole wait.
+  async requireEditableListing() {
+    const field = this.descriptionControl();
+    if ((await field.count()) !== 1) return;
+    const deadline = Date.now() + this.timeout;
+    while (Date.now() < deadline) {
+      if (await field.isEditable()) return;
+      await this.page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
+    }
+    const status = await this.listingStatus();
+    throw new Error(
+      `The listing cannot be edited${status ? ` (Status: ${status})` : ""}. A submitted item is locked until its review finishes; nothing was changed.`,
+    );
+  }
+
   async preflight({ locales, screenshots = true, descriptions = false }) {
     const identity = this.page.getByText(this.extensionId, { exact: false });
     await requireUnique(identity, "configured extension identity");
@@ -204,7 +301,7 @@ export class ChromeWebStoreDashboard {
     if (tagName !== "SELECT") await this.openLanguageMenu(language);
 
     for (const code of locales) {
-      const locale = localeConfig(code);
+      const locale = describeLocale(code);
       const { dashboardLabel } = locale;
       const name = localeNamePattern(locale);
       const options =
@@ -219,6 +316,7 @@ export class ChromeWebStoreDashboard {
     }
     if (tagName !== "SELECT") await this.page.keyboard.press("Escape");
 
+    await this.requireEditableListing();
     await this.selectLocale(locales[0]);
     if (descriptions) await this.requireDescriptionControl();
     if (screenshots) {
@@ -232,9 +330,9 @@ export class ChromeWebStoreDashboard {
         );
       }
       const globalCount = await this.screenshotCount(SECTIONS.global);
-      if (globalCount !== 4 && globalCount !== 5) {
+      if (globalCount > 5) {
         throw new Error(
-          `Global screenshots: expected 4 or 5 screenshot items, found ${globalCount}`,
+          `Global screenshots: expected at most 5 screenshot items, found ${globalCount}`,
         );
       }
       for (const section of [SECTIONS.localized, SECTIONS.global]) {
@@ -331,7 +429,7 @@ export class ChromeWebStoreDashboard {
   }
 
   async selectLocale(code) {
-    const locale = localeConfig(code);
+    const locale = describeLocale(code);
     const { dashboardLabel } = locale;
     const name = localeNamePattern(locale);
     const language = await requireUnique(this.languageControl(), "listing language selector");
@@ -364,8 +462,8 @@ export class ChromeWebStoreDashboard {
 
   async removeFirstScreenshot(section = SECTIONS.localized) {
     const count = await this.screenshotCount(section);
-    if (count !== 4 && count !== 5) {
-      throw new Error(`Screenshot removal expected 4 or 5 items, found ${count}`);
+    if (count < 1 || count > 5) {
+      throw new Error(`Screenshot removal expected 1 to 5 items, found ${count}`);
     }
     // Removal renumbers the remaining labels, so the leading control is taken
     // in DOM order rather than by the number in its name.
@@ -416,7 +514,7 @@ export class ChromeWebStoreDashboard {
     // lifecycle observer's alert watch.
     await this.waitForUploadedThumbnailReady(lifecycle, section);
     const lifecycleError = await lifecycle.evaluate(
-      (element) => element.__lurklootUploadState.error,
+      (element) => element.__storeListingUploadState.error,
     );
     const errors = this.uploadErrors(section);
     const errorMessages = [];
@@ -430,7 +528,7 @@ export class ChromeWebStoreDashboard {
         `Screenshot upload failed validation: ${[lifecycleError, ...errorMessages].filter(Boolean).join("; ")}`,
       );
     }
-    await lifecycle.evaluate((element) => element.__lurklootUploadObserver?.disconnect());
+    await lifecycle.evaluate((element) => element.__storeListingUploadObserver?.disconnect());
     this.uploadLifecycle = undefined;
     this.uploadPending = false;
   }
@@ -450,7 +548,9 @@ export class ChromeWebStoreDashboard {
   async waitForUploadedThumbnailReady(lifecycle, section = SECTIONS.localized) {
     const deadline = Date.now() + this.timeout;
     while (Date.now() < deadline) {
-      const state = await lifecycle.evaluate((element) => ({ ...element.__lurklootUploadState }));
+      const state = await lifecycle.evaluate((element) => ({
+        ...element.__storeListingUploadState,
+      }));
       if (state.error) throw new Error(`Screenshot upload failed validation: ${state.error}`);
       // Thumbnail URLs are re-signed by the dashboard, so a source that was
       // captured earlier cannot identify the new image. Completion is instead
@@ -489,7 +589,7 @@ export class ChromeWebStoreDashboard {
     const handle = await region.elementHandle();
     if (!handle) throw new Error("Localized screenshot region is not attached");
     await handle.evaluate((element) => {
-      element.__lurklootUploadObserver?.disconnect();
+      element.__storeListingUploadObserver?.disconnect();
       const state = { error: "", settledAt: null, started: false };
       const visible = (candidate) => {
         if (!(candidate instanceof HTMLElement) || !candidate.isConnected) return false;
@@ -531,8 +631,8 @@ export class ChromeWebStoreDashboard {
         characterData: true,
         subtree: true,
       });
-      element.__lurklootUploadState = state;
-      element.__lurklootUploadObserver = observer;
+      element.__storeListingUploadState = state;
+      element.__storeListingUploadObserver = observer;
       update();
     });
     return handle;
@@ -565,7 +665,7 @@ export class ChromeWebStoreDashboard {
     // element that may not exist yet.
     await this.page.evaluate(
       (patterns) => {
-        window.__lurklootSaveObserver?.disconnect();
+        window.__storeListingSaveObserver?.disconnect();
         const saved = new RegExp(patterns.saved, "i");
         const saving = new RegExp(patterns.saving, "i");
         const normalize = (text) => text.replace(/\s+/g, " ").trim();
@@ -587,8 +687,8 @@ export class ChromeWebStoreDashboard {
         const observer = new MutationObserver(readRegions);
         observer.observe(document.body, { childList: true, characterData: true, subtree: true });
         readRegions();
-        window.__lurklootSaveState = state;
-        window.__lurklootSaveObserver = observer;
+        window.__storeListingSaveState = state;
+        window.__storeListingSaveObserver = observer;
       },
       { saved: LABELS.saved.source, saving: LABELS.saving.source },
     );
@@ -596,12 +696,12 @@ export class ChromeWebStoreDashboard {
     await save.click();
     try {
       await this.page.waitForFunction(
-        () => window.__lurklootSaveState.acknowledged === true,
+        () => window.__storeListingSaveState.acknowledged === true,
         undefined,
         { timeout: this.timeout },
       );
     } finally {
-      await this.page.evaluate(() => window.__lurklootSaveObserver?.disconnect());
+      await this.page.evaluate(() => window.__storeListingSaveObserver?.disconnect());
     }
   }
 }

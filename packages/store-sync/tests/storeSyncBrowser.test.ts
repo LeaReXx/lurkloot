@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   abandonBrowserSession,
+  defaultProfileDir,
   endpointUrl,
   finishBrowserSession,
   probeEndpoint,
   resolveBrowserBinary,
   startBrowserSession,
   // @ts-expect-error The production utility is an executable JavaScript module.
-} from "../scripts/store-screenshot-browser.mjs";
+} from "../src/browser.mjs";
 
 function fakeChild() {
   const listeners: Record<string, (code?: number) => void> = {};
@@ -26,6 +27,21 @@ function fakeChild() {
     },
   };
 }
+
+describe("the signed-in profile", () => {
+  it("is named for what is being synced, so one bundle keeps one session between runs", () => {
+    expect(defaultProfileDir("lurkloot", { XDG_STATE_HOME: "/state" })).toBe(
+      "/state/lurkloot/cws-chrome-profile",
+    );
+    expect(defaultProfileDir("acme", { XDG_STATE_HOME: "/state" })).toBe(
+      "/state/acme/cws-chrome-profile",
+    );
+  });
+
+  it("falls back to the user's home when no state directory is set", () => {
+    expect(defaultProfileDir("lurkloot", {})).toMatch(/lurkloot[\\/]cws-chrome-profile$/);
+  });
+});
 
 describe("browser binary resolution", () => {
   it("prefers Chrome channels over Chromium when both are installed", async () => {

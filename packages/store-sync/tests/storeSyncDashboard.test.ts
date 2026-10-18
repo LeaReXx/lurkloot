@@ -3,16 +3,23 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
-// @ts-expect-error The production utility is an executable JavaScript module.
-import { ChromeWebStoreDashboard } from "../scripts/store-screenshot-dashboard.mjs";
-// @ts-expect-error The production utility is an executable JavaScript module.
-import { main, parseListingParts } from "../scripts/cws-listing.mjs";
+import {
+  ChromeWebStoreDashboard as Dashboard,
+  thumbnailId,
+  // @ts-expect-error The production utility is an executable JavaScript module.
+} from "../src/dashboard.mjs";
+
+// The driver needs a language to select and a page to drive; it knows nothing
+// else about what is being synced.
+type DashboardInstance = any;
+const ChromeWebStoreDashboard = Dashboard as unknown as new (
+  options: Record<string, unknown>,
+) => DashboardInstance;
 
 let browser: Browser;
 let page: Page;
 
 const extensionId = "aobaackpofkghaejdnnmpmeaiaoibhdn";
-const descriptions = new Map([["en", "English body"]]);
 const publisherId = "12345678-1234-1234-1234-123456789abc";
 
 const fixture = `
@@ -385,6 +392,54 @@ describe("Chrome Web Store dashboard adapter", () => {
   });
 });
 
+describe("Chrome Web Store dashboard readback", () => {
+  it("names a hosted thumbnail by the path segment before its size suffix", () => {
+    expect(thumbnailId("https://lh3.googleusercontent.com/AbC-123_x=s1280-w1280")).toBe(
+      "AbC-123_x",
+    );
+    expect(thumbnailId("https://lh3.googleusercontent.com/AbC-123_x")).toBe("AbC-123_x");
+    expect(thumbnailId("data:image/png;base64,AAAA#ar-1")).toBe("data:image/png;base64,AAAA#ar-1");
+    expect(thumbnailId("")).toBe("");
+  });
+
+  it("reads one language's description and both screenshot groups without changing anything", async () => {
+    await page.setContent(
+      fixture.replace(
+        "<span>Localized screenshots</span>",
+        "<label>Description<textarea>Body</textarea></label><span>Localized screenshots</span>",
+      ),
+    );
+    const dashboard = new ChromeWebStoreDashboard({ page, extensionId, timeout: 1_000 });
+
+    const state = await dashboard.readLocaleState("ar");
+
+    expect(state.language).toBe("Arabic – ar");
+    expect(state.description).toBe("Body");
+    expect(state.localized).toHaveLength(5);
+    expect(state.global).toHaveLength(5);
+    expect(new Set(state.localized).size).toBe(5);
+    expect(dashboard.hasMutated).toBe(false);
+  });
+
+  it("reloads the listing from the server, discarding edits the page only holds locally", async () => {
+    let requests = 0;
+    await page.route("https://dashboard.test/**", (route) => {
+      requests += 1;
+      return route.fulfill({ contentType: "text/html", body: fixture });
+    });
+    await page.goto("https://dashboard.test/listing");
+    await page.evaluate(() => {
+      document.querySelector("h1")!.textContent = "edited locally";
+    });
+    const dashboard = new ChromeWebStoreDashboard({ page, extensionId, timeout: 1_000 });
+
+    await dashboard.reload();
+
+    expect(requests).toBe(2);
+    expect(await page.locator("h1").textContent()).toMatch(/Store listing for/);
+  });
+});
+
 describe("Chrome Web Store dashboard adapter for new languages", () => {
   // A language added since the last run has an empty localized group.
   const emptyLocalizedFixture = fixture.replace(
@@ -478,6 +533,33 @@ describe("Chrome Web Store dashboard adapter for new languages", () => {
     expect(dashboard.hasMutated).toBe(true);
   });
 
+  it("names the review status when the listing is locked, before changing anything", async () => {
+    await page.setContent(
+      fixture.replace(
+        "<span>Localized screenshots</span>",
+        "<span>Status: Pending review</span><label>Description<textarea disabled>Body</textarea></label><span>Localized screenshots</span>",
+      ),
+    );
+    const dashboard = new ChromeWebStoreDashboard({ page, extensionId, timeout: 300 });
+
+    await expect(
+      dashboard.preflight({ locales: ["ar"], screenshots: false, descriptions: true }),
+    ).rejects.toThrow(/cannot be edited \(Status: Pending review\).*nothing was changed/i);
+    expect(dashboard.hasMutated).toBe(false);
+  });
+
+  it("waits out a form that is only disabled while it loads", async () => {
+    await page.setContent(
+      fixture.replace(
+        "<span>Localized screenshots</span>",
+        '<label>Description<textarea id="body" disabled>Body</textarea></label><span>Localized screenshots</span><script>setTimeout(() => { document.querySelector("#body").disabled = false; }, 150);</script>',
+      ),
+    );
+    const dashboard = new ChromeWebStoreDashboard({ page, extensionId, timeout: 2_000 });
+
+    await dashboard.preflight({ locales: ["en"], screenshots: false, descriptions: true });
+  });
+
   it("requires a single description field when descriptions are synced", async () => {
     await page.setContent(fixture);
     const dashboard = new ChromeWebStoreDashboard({ page, extensionId, timeout: 1_000 });
@@ -485,391 +567,5 @@ describe("Chrome Web Store dashboard adapter for new languages", () => {
     await expect(
       dashboard.preflight({ locales: ["en"], screenshots: false, descriptions: true }),
     ).rejects.toThrow(/detailed description field.*found 0/i);
-  });
-});
-
-describe("store listing CLI", () => {
-  it("rejects an invalid extension ID before reading screenshot files", async () => {
-    let validations = 0;
-
-    await expect(
-      main(
-        [],
-        { CWS_EXTENSION_ID: "../../another-item" },
-        {
-          validateFiles: async () => {
-            validations += 1;
-            return new Map();
-          },
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/32-character Chrome extension ID/i);
-
-    expect(validations).toBe(0);
-  });
-
-  it("validates files before launching a browser", async () => {
-    let launches = 0;
-
-    await expect(
-      main(
-        [],
-        { CWS_EXTENSION_ID: extensionId },
-        {
-          validateFiles: async () => {
-            throw new Error("missing screenshot");
-          },
-          openBrowser: async () => {
-            launches += 1;
-            throw new Error("must not launch");
-          },
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/missing screenshot/);
-
-    expect(launches).toBe(0);
-  });
-
-  it("supports validation-only operation without browser access", async () => {
-    let launches = 0;
-    const output: string[] = [];
-    const files = new Map([["en", [{ variant: { file: "01-drops" }, path: "/one.png" }]]]);
-
-    await main(
-      ["--locales", "en", "--validate-only"],
-      { CWS_EXTENSION_ID: extensionId },
-      {
-        validateFiles: async () => files,
-        loadDescriptions: async () => descriptions,
-        openBrowser: async () => {
-          launches += 1;
-          throw new Error("must not launch");
-        },
-        output: (message: string) => output.push(message),
-      },
-    );
-
-    expect(launches).toBe(0);
-    expect(output.join("\n")).toMatch(/validated 1 screenshot.*1 locale/i);
-    expect(output.join("\n")).toMatch(/validated 1 description.*1 locale/i);
-  });
-
-  it("requires a publisher ID before browser launch", async () => {
-    let launches = 0;
-    const files = new Map([["en", [{ variant: { file: "01-drops" }, path: "/one.png" }]]]);
-
-    await expect(
-      main(
-        ["--locales", "en"],
-        { CWS_EXTENSION_ID: extensionId, CWS_DASHBOARD_URL: "https://example.test/redirect" },
-        {
-          validateFiles: async () => files,
-          loadDescriptions: async () => descriptions,
-          openBrowser: async () => {
-            launches += 1;
-            throw new Error("must not launch");
-          },
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/CWS_PUBLISHER_ID/i);
-
-    expect(launches).toBe(0);
-  });
-
-  it("rejects an invalid publisher path before browser launch", async () => {
-    let launches = 0;
-    const files = new Map([["en", [{ variant: { file: "01-drops" }, path: "/one.png" }]]]);
-
-    await expect(
-      main(
-        ["--locales", "en"],
-        { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: "../../other-publisher" },
-        {
-          validateFiles: async () => files,
-          loadDescriptions: async () => descriptions,
-          openBrowser: async () => {
-            launches += 1;
-            throw new Error("must not launch");
-          },
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/publisher.*UUID/i);
-
-    expect(launches).toBe(0);
-  });
-
-  it("reuses the attached browser's existing context and finishes the session after a complete draft save", async () => {
-    let finished = false;
-    let newContextCalls = 0;
-    const calls: string[] = [];
-    const files = new Map([
-      [
-        "en",
-        ["01", "02", "03", "04", "05"].map((number) => ({
-          variant: { file: `${number}-new` },
-          path: `/${number}.png`,
-        })),
-      ],
-    ]);
-    const dashboard = {
-      images: ["a", "b", "c", "d", "e"],
-      async openAndWaitForAuthentication() {
-        calls.push("authenticated");
-      },
-      async preflight() {
-        calls.push("preflight");
-      },
-      async selectLocale() {},
-      async setDescription() {
-        calls.push("description");
-        return true;
-      },
-      async requireDistinctScreenshotSections() {},
-      async screenshotCount() {
-        return this.images.length;
-      },
-      async removeFirstScreenshot() {
-        this.images.shift();
-      },
-      async waitForScreenshotCount(count: number) {
-        expect(this.images).toHaveLength(count);
-      },
-      async uploadScreenshot(path: string) {
-        this.images.push(path);
-      },
-      async saveDraft() {
-        calls.push("saved");
-      },
-    };
-    const session = {
-      ownsBrowser: true,
-      context: { newPage: async () => ({}) },
-      browser: {
-        newContext: async () => {
-          newContextCalls += 1;
-          return {};
-        },
-      },
-    };
-
-    await main(
-      ["--locales", "en"],
-      { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: publisherId },
-      {
-        validateFiles: async () => files,
-        loadDescriptions: async () => descriptions,
-        openBrowser: async () => session,
-        finishBrowser: async () => {
-          finished = true;
-        },
-        createDashboard: () => dashboard,
-        output: () => {},
-      },
-    );
-
-    // One save each for the description, the locale's own screenshots and the
-    // shared global set.
-    expect(calls).toEqual(["authenticated", "preflight", "description", "saved", "saved", "saved"]);
-    expect(newContextCalls).toBe(0);
-    expect(finished).toBe(true);
-  });
-
-  it("keeps the signed-in browser when preflight fails before mutation", async () => {
-    let finished = false;
-    let abandoned: { mutated: boolean } | undefined;
-    const files = new Map([["en", [{ variant: { file: "01-drops" }, path: "/one.png" }]]]);
-    const dashboard = {
-      hasMutated: false,
-      async openAndWaitForAuthentication() {},
-      async preflight() {
-        throw new Error("preflight failed");
-      },
-    };
-
-    await expect(
-      main(
-        ["--locales", "en"],
-        { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: publisherId },
-        {
-          validateFiles: async () => files,
-          loadDescriptions: async () => descriptions,
-          openBrowser: async () => ({ ownsBrowser: true, context: { newPage: async () => ({}) } }),
-          finishBrowser: async () => {
-            finished = true;
-          },
-          abandonBrowser: async (
-            _session: unknown,
-            _output: unknown,
-            options: { mutated: boolean },
-          ) => {
-            abandoned = options;
-          },
-          createDashboard: () => dashboard,
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/preflight failed/);
-
-    // Rebuilding the session costs another sign-in and 2FA, so it is kept.
-    expect(abandoned).toEqual({ mutated: false });
-    expect(finished).toBe(false);
-  });
-
-  it("keeps the browser when the sign-in wait itself fails", async () => {
-    let finished = false;
-    let abandoned = false;
-    const files = new Map([["en", [{ variant: { file: "01-drops" }, path: "/one.png" }]]]);
-    const dashboard = {
-      hasMutated: false,
-      async openAndWaitForAuthentication() {
-        throw new Error("never signed in");
-      },
-    };
-
-    await expect(
-      main(
-        ["--locales", "en"],
-        { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: publisherId },
-        {
-          validateFiles: async () => files,
-          loadDescriptions: async () => descriptions,
-          openBrowser: async () => ({ ownsBrowser: true, context: { newPage: async () => ({}) } }),
-          finishBrowser: async () => {
-            finished = true;
-          },
-          abandonBrowser: async () => {
-            abandoned = true;
-          },
-          createDashboard: () => dashboard,
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/never signed in/);
-
-    // The operator may have signed in while this very step was still waiting.
-    expect(abandoned).toBe(true);
-    expect(finished).toBe(false);
-  });
-
-  it("abandons the session so a partially changed draft stays open after mutation failure", async () => {
-    let finished = false;
-    let abandoned = false;
-    const files = new Map([
-      [
-        "en",
-        ["01", "02", "03", "04", "05"].map((number) => ({
-          variant: { file: `${number}-new` },
-          path: `/${number}.png`,
-        })),
-      ],
-    ]);
-    const dashboard = {
-      hasMutated: false,
-      async openAndWaitForAuthentication() {},
-      async preflight() {},
-      async selectLocale() {},
-      async setDescription() {
-        return false;
-      },
-      async requireDistinctScreenshotSections() {},
-      async screenshotCount() {
-        return 5;
-      },
-      async removeFirstScreenshot() {
-        this.hasMutated = true;
-        throw new Error("remove failed after click");
-      },
-    };
-
-    await expect(
-      main(
-        ["--locales", "en"],
-        { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: publisherId },
-        {
-          validateFiles: async () => files,
-          loadDescriptions: async () => descriptions,
-          openBrowser: async () => ({ ownsBrowser: true, context: { newPage: async () => ({}) } }),
-          finishBrowser: async () => {
-            finished = true;
-          },
-          abandonBrowser: async (
-            _session: unknown,
-            _output: unknown,
-            options: { mutated: boolean },
-          ) => {
-            abandoned = options.mutated;
-          },
-          createDashboard: () => dashboard,
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/remove failed after click/);
-
-    expect(abandoned).toBe(true);
-    expect(finished).toBe(false);
-  });
-
-  it("syncs descriptions without reading screenshot files", async () => {
-    let validations = 0;
-    const output: string[] = [];
-
-    await main(
-      ["--only", "descriptions", "--locales", "en", "--validate-only"],
-      { CWS_EXTENSION_ID: extensionId },
-      {
-        validateFiles: async () => {
-          validations += 1;
-          throw new Error("must not read screenshots");
-        },
-        loadDescriptions: async () => descriptions,
-        output: (message: string) => output.push(message),
-      },
-    );
-
-    expect(validations).toBe(0);
-    expect(output.join("\n")).not.toMatch(/screenshot/i);
-  });
-
-  it("validates descriptions before launching a browser", async () => {
-    let launches = 0;
-
-    await expect(
-      main(
-        ["--only", "descriptions"],
-        { CWS_EXTENSION_ID: extensionId, CWS_PUBLISHER_ID: publisherId },
-        {
-          loadDescriptions: async () => {
-            throw new Error("description too long");
-          },
-          openBrowser: async () => {
-            launches += 1;
-            throw new Error("must not launch");
-          },
-          output: () => {},
-        },
-      ),
-    ).rejects.toThrow(/description too long/);
-
-    expect(launches).toBe(0);
-  });
-
-  it("parses the listing part selector", () => {
-    expect(parseListingParts(["--locales", "en"])).toEqual({
-      parts: ["screenshots", "descriptions"],
-      rest: ["--locales", "en"],
-    });
-    expect(parseListingParts(["--", "--only", "screenshots", "--locales", "ar"])).toEqual({
-      parts: ["screenshots"],
-      rest: ["--", "--locales", "ar"],
-    });
-    expect(() => parseListingParts(["--only", "summary"])).toThrow(/--only expects one of/);
-    expect(() => parseListingParts(["--only"])).toThrow(/--only expects one of/);
-    expect(() => parseListingParts(["--only", "screenshots", "--only", "descriptions"])).toThrow(
-      /Duplicate option --only/,
-    );
   });
 });

@@ -1038,3 +1038,43 @@ Supplemental sessions carry their own watch identity and `tablessOnly` marker. T
 Channel-scoped viewer authorization is acquired through the normal Twitch background transport. Privileged provider drivers send it directly to their own optional backends. JWTs and vendor session/device properties remain in memory; only validated bounded outcomes and counters reach transient popup snapshots. Provider sessions are not restored after a worker restart. The lane's completion and cooldown deadlines are (#594): the host stores them under `twitchExtensionLane` whenever they change, as provider ids, epoch deadlines and channel logins only, and restores them on the next start after validating each entry and dropping expired ones. Without that, an MV3 worker that is stopped between alarms would forget a finished provider and probe it again on every wake. The memory is tied to the signed-in Twitch login, read from Twitch's `login` cookie (a username, not a credential). It is restored only for the same login, and a change of Twitch's auth cookie stops the providers at once but forgets what the lane learned only if the login changed: Twitch re-sets that cookie on ordinary page loads. A restore never brings back what the host has already cleared (an account change, a disable, an ordinary invalidation), and reset clears the key with the rest of local storage. Disable, revocation, logout, channel changes and manual pause invalidate authority and cancel resources, including late results. Every report and every piece of driver activity (a pack opened, a giveaway joined, a sprite captured, a takeover started) is published through the provider's runtime session, which drops it once the session is no longer the provider's current one or was aborted. Each of those transitions stops or replaces the session first, so the lane meets #585's rule that stale work publishes nothing, without going through the controller's commits (#594). The lane follows the controller's accepted commits through an after-commit hook, not storage events or alarms. A change to its authority (Twitch enabled, a provider's settings, auth, the session's status or channel, a manual pause or watch) stops the providers synchronously, then a reconcile brings them back in line. The hook never waits on that reconcile, so a Twitch tick or auth refresh that settles its commit hooks never waits on provider session reads. Reconciles run one at a time. A tabless-only session commits a heartbeat result every minute, which keeps the driver refresh and session renewal cadence the every-alarm reconcile used to give.
 
 NoPixelV uses its normal REST watchtime/giveaway protocol. Fortnite uses its normal socket handshake, versioned state reads and sprite capture commands; authoritative participant increments confirm captures, and actual server reward state determines completion. Optional takeovers require separate opt-in, server eligibility and ownership confirmation. See [provider details and live acceptance](twitch-extensions/foundation.md).
+
+## Store listing tooling
+
+Two halves keep the Chrome Web Store listing in step with the repository. It is operator tooling,
+never shipped in the extension and never run in CI, because it needs a person signed in to Google.
+
+- **Generators** (`packages/extension/scripts/store/`) are specific to Lurkloot: they photograph the
+  built popup, copy `store-descriptions/*.txt` and make the promo tiles, and write the results into a
+  **bundle** directory (`artifacts/store/`, ignored by git). `store:generate` builds once and runs
+  every generator in one process. They are the only code that knows the listing languages
+  (`lurkloot.mjs`) or what a screenshot shows.
+- **`@lurkloot/store-sync`** (`packages/store-sync/`) is generic: it reads a bundle and drives the
+  Developer Dashboard to match it, then reads the dashboard back. It knows nothing about Lurkloot.
+
+The bundle layout is the contract between them
+([packages/store-sync/README.md](../packages/store-sync/README.md)). The rules that keep it a contract:
+
+- **The sync side stays liftable.** `store-sync` imports only itself, `node:` and `playwright`, names
+  no product and depends on no workspace package. The generators use only its public entry points
+  (`@lurkloot/store-sync`, `@lurkloot/store-sync/cli`), never its files. `storeSyncBoundary.test.ts`
+  and `storeGenerateBoundary.test.ts` enforce both directions, and the second also pins the exact
+  public API.
+- **A wrapper supplies options, not behaviour.** `scripts/store/cli.mjs` gives `store-sync` the bundle
+  directory, the command to rerun, the version the checkout is at and the Chrome profile name. The
+  one Lurkloot-specific guard, that `store-descriptions/` still matches the bundle's copies, is a
+  `checks` hook the sync calls, not code in it.
+- **A state belongs to the code that writes it.** `bundle.json` is written only by `stampBundle`,
+  and producers never hand-write it, so a file nobody stamped is never uploaded. `sync-state.json` is
+  written only by a sync, only after a readback against a fresh load of the dashboard has passed, and
+  a producer replacing its sections never touches it. A sync trusts it only while the local file
+  hashes and the dashboard's thumbnail ids both still match.
+- **One owner per side effect.** The dashboard driver is the only code that touches the page,
+  `browser.mjs` the only code that starts or leaves Chrome, and a generator replaces only the
+  sections it generated.
+- **Artwork is tied to the build it shows.** Each section is stamped with the version read from the
+  built `manifest.json`, never from tags. A sync refuses artwork from another version than the
+  checkout's, from different versions in one run, or from a dirty tree.
+- **Locators are tested against the real page.** `packages/store-sync/tests/fixtures/cws-dashboard/`
+  holds sanitized snapshots and `storeSyncContract.test.ts` runs every locator against them, not only
+  against hand-built pages.
