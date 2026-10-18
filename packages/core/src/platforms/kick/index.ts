@@ -833,6 +833,15 @@ export class KickAdapter implements PlatformAdapter {
     { signal }: AdapterOperationOptions = {},
   ): Promise<boolean> {
     if (!reward.claimId && reward.status !== "claimable") return false;
+    const suppressedUrl = this.claimCapability.suppressedUrl?.(campaign, reward);
+    if (suppressedUrl) {
+      // Already refused for want of a linked account, and already warned about.
+      // Re-stamp the guidance on the reward the caller holds, which may be a
+      // freshly refreshed copy, so its claim loop sees the refusal is explained
+      // and does not warn again on every tick (#779).
+      this.claimCapability.suppress?.(campaign, reward, suppressedUrl);
+      return false;
+    }
     if (this.claimCapability.isSuppressed?.(campaign, reward)) return false;
     // JSON.stringify drops `undefined`, so when no claim id was carried by
     // /drops/progress this matches the reference's `{ campaign_id, reward_id }`
@@ -865,6 +874,10 @@ export class KickAdapter implements PlatformAdapter {
       if (outcome.kind === "link_required") {
         this.claimCapability.suppress?.(campaign, reward, outcome.url);
         this.warnAccountNotLinked(campaign, reward, outcome.url);
+      } else {
+        // Guidance stored before a restart no longer explains this refusal;
+        // drop it so the claim loop reports it (#779).
+        reward.claimGuidance = undefined;
       }
       return false;
     } catch (error) {
