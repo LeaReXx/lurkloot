@@ -24,6 +24,36 @@ The store's default locale is `en` (manifest `default_locale`). Fill the main li
 | Marquee 1400×560 | `artifacts/store/global/promo/marquee.png` (optional) |
 | Icon 128×128 | from the built package |
 
+### Screenshot composition
+
+The listing shows screenshots scaled down, about 640×400 in its viewer and smaller in the
+carousel, and does not open them at full size. The images therefore carry no logo header or
+"01 / 05" counter, and each is one large localized headline with one large visual:
+
+1. Farm drops without lifting a finger: Twitch and Kick badges, the headline and three short
+   steps beside the whole popup at actual size, so users see what they install.
+2. Game priorities: Lurkloot farms every game by default; the real header with its
+   all-or-selected switch and the games list, enlarged.
+3. Much more than drops: what Lurkloot supports on both platforms, listed once, then what
+   each platform adds.
+4. Idle watchlist: the feature's name (each catalog's `navIdleWatchlist`), how it works in three
+   short steps, and what it keeps earning (Twitch channel points, Kick daily rewards and level
+   XP), beside three real watchlist rows whose ranks show the watch order.
+5. Farm everything, watch nothing: a larger closing statement, noting it is free and open
+   source.
+
+`StoreArtwork` frames real demo popup components; shots 02 and 04 crop the popup with scoped
+camera styles. The platform feature tags (`platforms` in `storeArtworkCopy.ts`) and the closing
+statement are editorial artwork; keep them to features Lurkloot actually supports.
+Promo tiles have their own composition.
+
+Review at 640×400 and 400×250 as well as the 1280×800 export size. Headlines start at 104px
+(76px beside the opening popup, 92px above the watchlist guide, 156px in the closing statement) and fit to their actual glyphs
+after fonts load; the platform feature tags and the watchlist guide shrink until they fit.
+Generation rejects headline overflow, clipped subtitles, steps or checklist items, copy in the
+canvas's bottom margin, a clipped opening popup, and focus regions outside the canvas. The
+numbered file stems are stable upload slots; their names predate these stories.
+
 ## 2. Localized listings
 
 `pnpm store:generate` then `pnpm store:sync` sets the description and five screenshots of every
