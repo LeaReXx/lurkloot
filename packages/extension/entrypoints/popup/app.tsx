@@ -155,7 +155,7 @@ export function PopupApp(): React.ReactElement {
       requested === "games"
       || requested === "kick"
       || requested === "watchlist"
-      || requested === "extensions"
+      || requested === "free"
         ? requested
         : "queue";
     return (
@@ -164,10 +164,9 @@ export function PopupApp(): React.ReactElement {
           adapter={POPUP_ADAPTER}
           initialState={{
             preview: true,
+            view: story === "games" ? "games" : undefined,
             locale: POPUP_LOCALE,
-            variant: screenshotVariant(
-              story === "kick" ? "easy" : story === "watchlist" ? "extras" : "drops",
-            ),
+            variant: screenshotVariant(story === "watchlist" ? "extras" : "drops"),
           }}
         />
       </StoreArtwork>

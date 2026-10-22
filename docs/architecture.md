@@ -508,6 +508,14 @@ or sends a heartbeat.
   (`tabless_fallback`). The tick moves the watch to a tab through the watch-tab port. The job ends
   once the hook has run. A post-claim handoff's immediate heartbeat leaves the fallback to the next
   job or tick, as before.
+- **Fallback expiry (#884).** The scheduler owns the fallback's lifetime. It stamps
+  `tablessFallbackAt` and counts `tablessFallbackAttempts` for the channel. Once the fallback is
+  older than `TABLESS_FALLBACK_RETRY_BASE_MS` (10 minutes) doubled per earlier attempt, the next tick
+  retries tabless for the same channel with fresh heartbeat counters. The fallback that reaches
+  `TABLESS_FALLBACK_MAX_ATTEMPTS` (three) is final, so a tabless watch that keeps failing settles on
+  its tab after three opens. A healthy heartbeat, a channel switch or a cleared session resets the
+  count. `heartbeat.test.ts` ("tab fallback expiry") drives six hours of failing heartbeats and
+  asserts the opens stop.
 
 ### Host ports and jobs (#593)
 
@@ -890,7 +898,7 @@ Core is unchanged by any of this: it asks a `WebSocketFactory` for a URL. The CL
 - Followed channels come from `https://kick.com/api/v1/user/livestreams`, which Kick itself filters to the account's live follows (no pagination of the full follow list), cached for five minutes in `KickDiscoveryState`. Strict discovery awaits stale refreshes to keep fetch lifecycle observation inside its cycle; standalone callers can still read stale values immediately. A signed-out session or a failed lookup answers with an empty list, and selection falls back to viewer count.
 - Channel validation calls `https://kick.com/api/v2/channels/{username}` and checks live state plus category id. If that fails, it falls back to parsing channel page HTML.
 - Reward claiming posts to `https://web.kick.com/api/v1/drops/claim` with campaign, reward, and claim identifiers.
-- Tabless watching exchanges the Kick session for a viewer WebSocket token, opens Kick's viewer socket, and sends watch livestream events while the channel remains live and in the expected category. It keeps the web client's cadence (#756): `channel_handshake` every 15 s and `ping` every 30 s on their own timers, plus one `tracking.user.watch.livestream` at connect and then once per interval. The interval comes from Kick's `/api/internal/settings/global` (120 s in October 2026), cached for 10 minutes, clamped to 30–300 s, and 120 s when unreadable. Each tracking event carries the stream's `vod_id` from `/api/v2/channels/<slug>/info` when Kick reports one. A watch stays healthy while a tracking event went out within two intervals plus 30 s.
+- Tabless watching exchanges the Kick session for a viewer WebSocket token, opens Kick's viewer socket, and sends watch livestream events while the channel remains live. The watcher does not check the category: the scheduler's per-tick `checkChannel` owns that (#883). It keeps the web client's cadence (#756): `channel_handshake` every 15 s and `ping` every 30 s on their own timers, plus one `tracking.user.watch.livestream` at connect and then once per interval. The interval comes from Kick's `/api/internal/settings/global` (120 s in October 2026), cached for 10 minutes, clamped to 30–300 s, and 120 s when unreadable. Each tracking event carries the stream's `vod_id` from `/api/v2/channels/<slug>/info` when Kick reports one. That route is read with `cache: "no-store"`, because Kick serves it with `max-age=14400` and a cached copy would hide a new livestream id or an offline stream. A watch stays healthy while a tracking event went out within two intervals plus 30 s.
 
 ## Watch Tabs
 
@@ -1038,3 +1046,50 @@ Supplemental sessions carry their own watch identity and `tablessOnly` marker. T
 Channel-scoped viewer authorization is acquired through the normal Twitch background transport. Privileged provider drivers send it directly to their own optional backends. JWTs and vendor session/device properties remain in memory; only validated bounded outcomes and counters reach transient popup snapshots. Provider sessions are not restored after a worker restart. The lane's completion and cooldown deadlines are (#594): the host stores them under `twitchExtensionLane` whenever they change, as provider ids, epoch deadlines and channel logins only, and restores them on the next start after validating each entry and dropping expired ones. Without that, an MV3 worker that is stopped between alarms would forget a finished provider and probe it again on every wake. The memory is tied to the signed-in Twitch login, read from Twitch's `login` cookie (a username, not a credential). It is restored only for the same login, and a change of Twitch's auth cookie stops the providers at once but forgets what the lane learned only if the login changed: Twitch re-sets that cookie on ordinary page loads. A restore never brings back what the host has already cleared (an account change, a disable, an ordinary invalidation), and reset clears the key with the rest of local storage. Disable, revocation, logout, channel changes and manual pause invalidate authority and cancel resources, including late results. Every report and every piece of driver activity (a pack opened, a giveaway joined, a sprite captured, a takeover started) is published through the provider's runtime session, which drops it once the session is no longer the provider's current one or was aborted. Each of those transitions stops or replaces the session first, so the lane meets #585's rule that stale work publishes nothing, without going through the controller's commits (#594). The lane follows the controller's accepted commits through an after-commit hook, not storage events or alarms. A change to its authority (Twitch enabled, a provider's settings, auth, the session's status or channel, a manual pause or watch) stops the providers synchronously, then a reconcile brings them back in line. The hook never waits on that reconcile, so a Twitch tick or auth refresh that settles its commit hooks never waits on provider session reads. Reconciles run one at a time. A tabless-only session commits a heartbeat result every minute, which keeps the driver refresh and session renewal cadence the every-alarm reconcile used to give.
 
 NoPixelV uses its normal REST watchtime/giveaway protocol. Fortnite uses its normal socket handshake, versioned state reads and sprite capture commands; authoritative participant increments confirm captures, and actual server reward state determines completion. Optional takeovers require separate opt-in, server eligibility and ownership confirmation. See [provider details and live acceptance](twitch-extensions/foundation.md).
+
+## Store listing tooling
+
+Two halves keep the Chrome Web Store listing in step with the repository. It is operator tooling,
+never shipped in the extension and never run in CI, because it needs a person signed in to Google.
+
+- **Generators** (`packages/extension/scripts/store/`) are specific to Lurkloot: they photograph the
+  built popup, copy `store-descriptions/*.txt` and make the promo tiles, and write the results into a
+  **bundle** directory (`artifacts/store/`, ignored by git). `store:generate` builds once and runs
+  every generator in one process. They are the only code that knows the listing languages
+  (`lurkloot.mjs`) or what a screenshot shows.
+- **`@lurkloot/store-sync`** (`packages/store-sync/`) is generic: it reads a bundle and drives the
+  Developer Dashboard to match it, then reads the dashboard back. It knows nothing about Lurkloot.
+
+The bundle layout is the contract between them
+([packages/store-sync/README.md](../packages/store-sync/README.md)). The rules that keep it a contract:
+
+- **The sync side stays liftable.** `store-sync` imports only itself, `node:` and `playwright`, names
+  no product and depends on no workspace package. The generators use only its public entry points
+  (`@lurkloot/store-sync`, `@lurkloot/store-sync/cli`), never its files. `storeSyncBoundary.test.ts`
+  and `storeGenerateBoundary.test.ts` enforce both directions, and the second also pins the exact
+  public API.
+- **A wrapper supplies options, not behaviour.** `scripts/store/cli.mjs` gives `store-sync` the bundle
+  directory, the command to rerun, the version the checkout is at and the Chrome profile name. The
+  one Lurkloot-specific guard, that `store-descriptions/` still matches the bundle's copies, is a
+  `checks` hook the sync calls, not code in it.
+- **A state belongs to the code that writes it.** `bundle.json` is written only by `stampBundle`,
+  and producers never hand-write it, so a file nobody stamped is never uploaded. `sync-state.json` is
+  written only by a sync, only after a readback against a fresh load of the dashboard has passed, and
+  a producer replacing its sections never touches it. A sync trusts it only while the local file
+  hashes and the dashboard's thumbnail ids both still match.
+- **One owner per side effect.** The dashboard driver is the only code that touches the page,
+  `browser.mjs` the only code that starts or leaves Chrome, and a generator replaces only the
+  sections it generated.
+- **Artwork is tied to the build it shows.** Each section is stamped with the version read from the
+  built `manifest.json`, never from tags. A sync refuses artwork from another version than the
+  checkout's, from different versions in one run, or from a dirty tree.
+- **Locators are tested against the real page.** `packages/store-sync/tests/fixtures/cws-dashboard/`
+  holds sanitized snapshots and `storeSyncContract.test.ts` runs every locator against them, not only
+  against hand-built pages.
+
+The screenshot camera belongs to `StoreArtwork` and its scoped `storeArtwork.css`, not to
+product components. It can omit surrounding chrome and enlarge real demo UI, but must not
+change runtime state or normal popup layout. The opening story shows the whole popup at
+actual size; the others crop it with scoped camera styles or use editorial artwork.
+Localized headings fit after bundled fonts load; the screenshot generator waits for that fit,
+and rejects overflowing copy, clipped subjects or an out-of-canvas focus region.

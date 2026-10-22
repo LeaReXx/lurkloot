@@ -19,16 +19,45 @@ The store's default locale is `en` (manifest `default_locale`). Fill the main li
 | Summary (≤132) | From the package: the `extensionDescription` message |
 | Description | `packages/extension/store-descriptions/en.txt` |
 | Category | Productivity |
-| Screenshots (1280×800) | `packages/extension/artifacts/store-screenshots/en/` (5 PNGs, numbered for order: `01-drops`, `02-extras`, `03-easy`, `04-settings`, `05-updated`) |
-| Small promo tile 440×280 | `artifacts/store-promo/en/lurkloot-promo-small-440x280.png` (optional) |
-| Marquee 1400×560 | `artifacts/store-promo/en/lurkloot-promo-marquee-1400x560.png` (optional) |
+| Screenshots (1280×800) | `packages/extension/artifacts/store/global/screenshots/` (5 PNGs, numbered for order: `01-drops`, `02-extras`, `03-easy`, `04-settings`, `05-updated`) |
+| Small promo tile 440×280 | `artifacts/store/global/promo/small.png` (optional) |
+| Marquee 1400×560 | `artifacts/store/global/promo/marquee.png` (optional) |
 | Icon 128×128 | from the built package |
+
+### Screenshot composition
+
+The listing shows screenshots scaled down, about 640×400 in its viewer and smaller in the
+carousel, and does not open them at full size. The images therefore carry no logo header or
+"01 / 05" counter, and each is one large localized headline with one large visual:
+
+1. Farm drops without lifting a finger: Twitch and Kick badges, the headline and three short
+   steps beside the whole popup at actual size, so users see what they install.
+2. Game priorities: Lurkloot farms every game by default; the real header with its
+   all-or-selected switch and the games list, enlarged.
+3. Much more than drops: what Lurkloot supports on both platforms, listed once, then what
+   each platform adds.
+4. Idle watchlist: the feature's name (each catalog's `navIdleWatchlist`), how it works in three
+   short steps, and what it keeps earning (Twitch channel points, Kick daily rewards and level
+   XP), beside three real watchlist rows whose ranks show the watch order.
+5. Farm everything, watch nothing: a larger closing statement, noting it is free and open
+   source.
+
+`StoreArtwork` frames real demo popup components; shots 02 and 04 crop the popup with scoped
+camera styles. The platform feature tags (`platforms` in `storeArtworkCopy.ts`) and the closing
+statement are editorial artwork; keep them to features Lurkloot actually supports.
+Promo tiles have their own composition.
+
+Review at 640×400 and 400×250 as well as the 1280×800 export size. Headlines start at 104px
+(76px beside the opening popup, 92px above the watchlist guide, 156px in the closing statement) and fit to their actual glyphs
+after fonts load; the platform feature tags and the watchlist guide shrink until they fit.
+Generation rejects headline overflow, clipped subtitles, steps or checklist items, copy in the
+canvas's bottom margin, a clipped opening popup, and focus regions outside the canvas. The
+numbered file stems are stable upload slots; their names predate these stories.
 
 ## 2. Localized listings
 
-`pnpm cws:listing:sync` sets the description and five screenshots of every locale; see
-[Syncing the listing automatically](#syncing-the-listing-automatically). Promo tiles per locale are
-under `artifacts/store-promo/<locale>/`.
+`pnpm store:generate` then `pnpm store:sync` sets the description and five screenshots of every
+locale; see [Syncing the listing](#syncing-the-listing).
 
 ## 3. Privacy / compliance tab
 
@@ -43,31 +72,62 @@ Run manual acceptance with real logged-in Twitch and Kick sessions (private APIs
 notice): enable each platform, confirm visible-tab mode pins/mutes a watch tab, confirm tabless mode
 falls back when unhealthy, and confirm reward progress on the platforms' inventory pages.
 
-## Regenerating assets
+## Generating the listing content
+
+Everything the listing says is generated into one directory, the **bundle**, at
+`packages/extension/artifacts/store/` (ignored by git). The generators are specific to Lurkloot; what
+reads the bundle, `@lurkloot/store-sync`, is not. See
+[its README](../packages/store-sync/README.md) for the layout, which is the contract between them.
 
 ```bash
-pnpm zip && pnpm zip:firefox     # extension packages
-pnpm screenshot:store            # artifacts/store-screenshots/<locale>/ (all 17)
-pnpm promo:store                 # artifacts/store-promo/<locale>/
-pnpm promo:store:sync            # same files as promo:store; does not upload
+pnpm zip && pnpm zip:firefox          # extension packages
+pnpm store:generate                   # build, then screenshots + promo + descriptions
+pnpm store:generate:screenshots       # build, then the popup screenshots
+pnpm store:generate:promo             # build, then the promo tiles
+pnpm store:generate:descriptions      # copy store-descriptions/*.txt (no build)
 ```
 
-Pass locale codes to limit, for example `pnpm screenshot:store ja id pl ko uk cs`. Promo
-tiles for every catalog locale, including those six, are under `artifacts/store-promo/<locale>/`.
-`promo:store:sync` only writes those tiles. It does not replace anything in the Developer Dashboard.
+Pass `--locales` to limit, for example `pnpm store:generate --locales ja id`. An unknown locale is an
+error rather than being skipped. `store:generate` builds once and runs the generators in one process,
+so the locale list reaches all of them. Each generator replaces only its own sections for the
+languages it was given and stamps them, so generating some languages never erases the rest.
 
-## Syncing the listing automatically
+- **Screenshots** are five 1280×800 PNGs per language, in `<locale>/screenshots/`. The default
+  language, `en`, has no group of its own on the dashboard, so its artwork goes to `global/screenshots/`
+  and `en` gets none.
+- **Promo tiles** are the small and marquee tiles in `global/promo/`, made from `en`, because the
+  dashboard has one pair for the whole listing. They are generated only when `en` is part of the run,
+  and need ImageMagick (`magick`) to drop the alpha channel the store rejects. Nothing uploads them yet;
+  add them in the Developer Dashboard by hand.
+- **Descriptions** are `store-descriptions/<locale>.txt` copied into `<locale>/description.txt`. A sync
+  refuses when a source file differs from the bundle's copy, so run
+  `pnpm store:generate:descriptions` after editing one.
+
+Each section is stamped with the version of the **build** the screenshots were made from (read from the
+built `manifest.json`, not from tags), the commit, and whether the tree was dirty. To list what a
+version shipped, generate from its release commit in a worktree.
+
+## Syncing the listing
 
 The public Chrome Web Store API cannot update listing screenshots or per-language descriptions. The
-local operator command below uses a visible Chrome session to set the detailed description and the
-five screenshots of every locale through the Developer Dashboard, then save the listing draft:
+local operator commands below use a Chrome session you sign into to edit the Developer Dashboard draft,
+then read it back:
 
 ```bash
-pnpm cws:listing:sync
+pnpm store:validate                   # check the bundle; no browser
+pnpm store:sync                       # edit the draft, save it, read it back
+pnpm store:sync --locales ja id       # only those languages (not the shared group)
+pnpm store:sync --only descriptions   # or screenshots, or global
+pnpm store:verify                     # compare the dashboard with the bundle; changes nothing
+pnpm store:snapshot --locales en es   # retake the dashboard snapshots for the contract tests
 ```
 
-Each description is the plain-text file `packages/extension/store-descriptions/<locale>.txt`. The
-summary is not synced: the dashboard takes it from the package's `extensionDescription` message.
+`store:sync` generates nothing. Run `store:generate` first; it refuses a bundle whose artwork came from
+another version than this checkout's, or from a dirty tree (`--allow-version-mismatch`,
+`--allow-dirty`). The shared group is synced only by a run that names no language, or with `--global` or
+`--only global`. Everything else, including the Chrome session, the profile at
+`~/.local/state/lurkloot/cws-chrome-profile`, readback, skipping unchanged screenshots and locked
+listings, is in the [package README](../packages/store-sync/README.md).
 
 `CWS_EXTENSION_ID` and `CWS_PUBLISHER_ID` come from the repository `mise.toml`. Without mise
 activated in your shell, export them by hand:
@@ -77,87 +137,26 @@ export CWS_EXTENSION_ID=aobaackpofkghaejdnnmpmeaiaoibhdn
 export CWS_PUBLISHER_ID=<publisher-id-from-the-dashboard>
 ```
 
-The command regenerates and validates the images and descriptions, then starts Chrome itself and
-attaches to it over the DevTools protocol. Sign in to Google and complete 2FA in the window it opens;
-automation resumes on its own, sets the description and replaces the five screenshots for each of the
-17 locales in numbered order, and saves each locale. The dashboard language list comes from the
-`_locales` directories in the uploaded package, so upload a build that contains `ja`, `id`, `pl`,
-`ko`, `uk`, and `cs` before the first listing run for those languages.
-
-A language added that way starts with no screenshots of its own. The command fills it in order rather
-than rotating, and checks for every language that the localized and global groups are separate
-panels, so an empty language can never be mistaken for the shared set. The empty-group layout has not
-yet been seen on the live dashboard: run a new language on its own first, for example
-`pnpm cws:listing -- --locales ja`, and look at the draft before syncing the rest.
-
-Playwright never launches the browser. Google refuses interactive sign-in in a browser started with
-automation switches — it answers `accounts.google.com/v3/signin/rejected`, "Couldn't sign you in;
-this browser or app may not be secure". Chrome is therefore spawned as an ordinary browser with no
-automation flags, and automation only attaches once you are signed in.
-
-The browser runs against a persistent profile at `$XDG_STATE_HOME/lurkloot/cws-chrome-profile`
-(`~/.local/state/lurkloot/cws-chrome-profile` by default), alongside your other browser state and
-outside the repository. Signing in once is enough; later runs reuse that session. The directory holds
-live Google credentials — keep it local, never copy it anywhere or share it. Delete it to sign out.
-Three optional variables adjust this:
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `CWS_CHROME_BINARY` | first of `google-chrome-stable`, `google-chrome`, `chrome`, `chromium`, `chromium-browser` on `PATH` | Full path to the browser to start |
-| `CWS_CDP_PORT` | `9333` | DevTools port; chosen off the usual `9222` to avoid colliding with your own debugging sessions |
-| `CWS_CHROME_PROFILE` | `$XDG_STATE_HOME/lurkloot/cws-chrome-profile` | Use a different profile directory |
-
-Chrome channels are preferred over Chromium because Google frequently refuses sign-in on Chromium
-builds; if only Chromium is found the command says so before continuing.
-
-If something is already listening on the port, the command attaches to it instead of starting a
-browser, and leaves it running when it finishes — closing only the automation connection. That is the way to reuse a session you signed into
-yourself:
+Sign in to Google and complete 2FA in the window the first run opens; later runs reuse that session.
+To reuse a Chrome you signed into yourself, start it with the debugging port and the profile:
 
 ```bash
-# The binary name varies by distribution: google-chrome, google-chrome-stable, chrome.
 "$BROWSER" --user-data-dir=~/.local/state/lurkloot/cws-chrome-profile --remote-debugging-port=9333
-CWS_CDP_PORT=9333 pnpm cws:listing
+CWS_CDP_PORT=9333 pnpm store:sync
 ```
 
-The listing holds two screenshot groups. **Localized screenshots** change with the language
-selector, so each of the 17 locales gets its own five. **Global screenshots** are shared across every
-language; the command fills them from the English set, and only when `en` is part of the run. Both
-groups label their thumbnails "Screenshot N", so each is located from its own heading rather than by
-a page-wide search. Within a group the leading image is removed and its replacement appended, one at
-a time, which rotates the set exactly once per image and preserves the original order.
+This workflow deliberately stops at a saved draft. Nothing here submits the item for review or
+publishes it; use the normal release flow for that. Once a release is submitted the listing is locked
+until its review ends: `store:sync` says so and changes nothing, and `store:verify` still works.
 
-Removing an image raises a confirmation dialog, which the command answers. Image changes take effect
-as they are made rather than on save, so "Save draft" is often already inactive by the end of a
-group; the command reports that and moves on instead of failing.
+## Adding a language
 
-This workflow deliberately stops at a saved draft. It has no operation that submits the item for
-review or publishes it. Use the normal release flow when the draft should be submitted.
-
-To sync already-generated files, retry selected locales after an interruption, or touch only one
-part of the listing:
-
-```bash
-pnpm cws:listing
-pnpm cws:listing -- --locales ja id pl ko uk cs
-pnpm cws:listing -- --only descriptions
-pnpm cws:listing -- --only screenshots --locales ar
-```
-
-`--only descriptions` needs no generated screenshots.
-
-A run interrupted between deletion and upload may leave four screenshots in one locale. The next
-locale-filtered run repairs that state before replacing the full ordered set. The operation is safe
-to repeat.
-
-Validate the screenshot files, descriptions and extension ID without starting Chrome or changing the
-dashboard (`CWS_PUBLISHER_ID` is only checked for a live run):
-
-```bash
-pnpm cws:listing -- --locales en --validate-only
-```
-
-Dashboard automation depends on Google's unsupported UI rather than a stable API. It uses accessible
-labels and fails closed if an expected control is missing or ambiguous. If failure occurs after a
-change, it leaves Chrome open for inspection — including the browser it started, which you close
-yourself — and reports the exact locale and recovery command; no listing submission is attempted.
+1. In the repository: the catalog `packages/locales/messages/<code>.json` and its wiring, the store
+   artwork copy, `store-descriptions/<code>.txt`, and the code in `LOCALES` in
+   `packages/extension/scripts/store/lurkloot.mjs`. `pnpm locales:check` and the i18n test fail if the
+   catalogs and `LOCALES` disagree.
+2. Release a package containing the language. The dashboard builds its language list from the uploaded
+   package's `_locales`, so the language does not exist there before.
+3. From a checkout at that release, with the listing not in review:
+   `pnpm store:generate --locales <code>`, then `pnpm store:sync --locales <code>`. Sync one new
+   language on its own first.

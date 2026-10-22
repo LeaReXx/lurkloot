@@ -1,20 +1,25 @@
-import { describe, expect, it } from "vitest";
 import { basename } from "node:path";
+import { describe, expect, it } from "vitest";
 import {
-  replaceLocaleScreenshots,
-  syncStoreListing,
+  createContext,
+  replaceScreenshots as replace,
+  syncStoreListing as sync,
   // @ts-expect-error The production utility is an executable JavaScript module.
-} from "../scripts/store-listing-sync.mjs";
+} from "../src/sync.mjs";
 
-type UploadFile = { variant: { file: string }; path: string };
+const context = createContext({ command: "pnpm store:sync" });
+const replaceLocaleScreenshots = (options: Record<string, unknown>) =>
+  replace({ context, scope: options.locale, ...options });
+const syncStoreListing = (options: Record<string, unknown>) => sync({ context, ...options });
 
-const desiredFiles: UploadFile[] = ["01", "02", "03", "04", "05"].map((number) => ({
-  variant: { file: `${number}-new` },
-  path: `/screenshots/lurkloot-${number}-new-1280x800.png`,
-}));
+type UploadFile = { name: string; path: string };
+
+const files = (names: string[]): UploadFile[] =>
+  names.map((number) => ({ name: `${number}-new.png`, path: `/bundle/${number}-new.png` }));
+const desiredFiles = files(["01", "02", "03", "04", "05"]);
 
 function imageId(path: string): string {
-  return basename(path).match(/lurkloot-(\d\d)-/)?.[1] ?? "unknown";
+  return basename(path).match(/^(\d\d)-/)?.[1] ?? "unknown";
 }
 
 class MemoryDashboard {
@@ -45,7 +50,7 @@ class MemoryDashboard {
     return section === "global" ? this.globalImages : this.images;
   }
 
-  async preflight(): Promise<void> {
+  async preflight(_options?: unknown): Promise<void> {
     this.preflightCalls += 1;
   }
 
@@ -91,6 +96,19 @@ class MemoryDashboard {
     if (!this.selectedLocale) throw new Error("no locale selected");
     this.savedLocales.push(this.selectedLocale);
   }
+}
+
+const everything = { descriptions: true, screenshots: true, global: true };
+
+type Scope = { description?: { text: string }; screenshots?: UploadFile[] };
+
+// Just enough of a bundle for the sync to walk.
+function bundleOf(locales: Record<string, Scope>, global?: UploadFile[]) {
+  return {
+    locales: Object.keys(locales),
+    scope: (code: string) => locales[code],
+    global: global ? { screenshots: global } : undefined,
+  };
 }
 
 describe("store listing sync", () => {
@@ -142,43 +160,11 @@ describe("store listing sync", () => {
 
     await expect(
       replaceLocaleScreenshots({ locale: "ar", files: desiredFiles, dashboard }),
-    ).rejects.toThrow(/ar.*03-new.*upload.*network upload failed.*retry.*--locales ar/i);
+    ).rejects.toThrow(
+      /ar.*03-new.*upload.*network upload failed.*retry.*pnpm store:sync --locales ar/i,
+    );
     expect(dashboard.savedLocales).toEqual([]);
     expect(dashboard.images).toHaveLength(4);
-  });
-
-  it("preflights once and saves each locale only after its complete replacement", async () => {
-    const dashboard = new MemoryDashboard(
-      new Map([
-        ["en", ["old-a", "old-b", "old-c", "old-d", "old-e"]],
-        ["ar", ["old-a", "old-b", "old-c", "old-d", "old-e"]],
-      ]),
-    );
-    const filesByLocale = new Map([
-      ["en", desiredFiles],
-      ["ar", desiredFiles],
-    ]);
-
-    await syncStoreListing({ locales: ["en", "ar"], filesByLocale, dashboard });
-
-    expect(dashboard.preflightCalls).toBe(1);
-    expect(dashboard.imagesByLocale.get("en")).toEqual(["01", "02", "03", "04", "05"]);
-    expect(dashboard.imagesByLocale.get("ar")).toEqual(["01", "02", "03", "04", "05"]);
-    // The shared set is rewritten once, from the English artwork.
-    expect(dashboard.globalImages).toEqual(["01", "02", "03", "04", "05"]);
-    expect(dashboard.savedLocales).toHaveLength(3);
-  });
-
-  it("leaves the shared set alone when English is not part of the run", async () => {
-    const dashboard = new MemoryDashboard(
-      new Map([["ar", ["old-a", "old-b", "old-c", "old-d", "old-e"]]]),
-    );
-    const filesByLocale = new Map([["ar", desiredFiles]]);
-
-    await syncStoreListing({ locales: ["ar"], filesByLocale, dashboard });
-
-    expect(dashboard.imagesByLocale.get("ar")).toEqual(["01", "02", "03", "04", "05"]);
-    expect(dashboard.globalImages).toEqual(["old-a", "old-b", "old-c", "old-d", "old-e"]);
   });
 
   it("fills a language that has no screenshots yet in order without removing anything", async () => {
@@ -201,6 +187,40 @@ describe("store listing sync", () => {
     expect(dashboard.observedCounts.slice(0, 3)).toEqual([3, 4, 5]);
   });
 
+  it("trims a set that is longer than the one wanted, then rotates the rest into place", async () => {
+    const dashboard = new MemoryDashboard(
+      new Map([["ja", ["old-a", "old-b", "old-c", "old-d", "old-e"]]]),
+    );
+
+    await replaceLocaleScreenshots({ locale: "ja", files: files(["01", "02", "03"]), dashboard });
+
+    expect(dashboard.imagesByLocale.get("ja")).toEqual(["01", "02", "03"]);
+    expect(dashboard.observedCounts).toEqual([4, 3, 2, 3, 2, 3, 2, 3]);
+    expect(dashboard.savedLocales).toEqual(["ja"]);
+  });
+
+  it("can reduce a full set to a single screenshot", async () => {
+    const dashboard = new MemoryDashboard(
+      new Map([["ja", ["old-a", "old-b", "old-c", "old-d", "old-e"]]]),
+    );
+
+    await replaceLocaleScreenshots({ locale: "ja", files: files(["01"]), dashboard });
+
+    expect(dashboard.imagesByLocale.get("ja")).toEqual(["01"]);
+  });
+
+  it("grows a short set to the number wanted", async () => {
+    const dashboard = new MemoryDashboard(new Map([["ja", ["old-a", "old-b"]]]));
+
+    await replaceLocaleScreenshots({
+      locale: "ja",
+      files: files(["01", "02", "03", "04"]),
+      dashboard,
+    });
+
+    expect(dashboard.imagesByLocale.get("ja")).toEqual(["01", "02", "03", "04"]);
+  });
+
   it("checks the sections are distinct before changing any screenshot", async () => {
     const dashboard = new MemoryDashboard(new Map([["ja", []]]));
     dashboard.requireDistinctScreenshotSections = async () => {
@@ -213,6 +233,91 @@ describe("store listing sync", () => {
     expect(dashboard.uploadCalls).toBe(0);
   });
 
+  it("names the shared group's own retry command when it fails", async () => {
+    const dashboard = new MemoryDashboard();
+    dashboard.failUploadAt = 2;
+
+    await expect(
+      replaceLocaleScreenshots({
+        locale: "global",
+        files: desiredFiles,
+        dashboard,
+        section: "global",
+      }),
+    ).rejects.toThrow(/global.*retry with: pnpm store:sync --only global/i);
+  });
+});
+
+describe("syncing a bundle", () => {
+  it("preflights once and saves each group only after its complete replacement", async () => {
+    const dashboard = new MemoryDashboard(
+      new Map([
+        ["ja", ["old-a", "old-b", "old-c", "old-d", "old-e"]],
+        ["ar", ["old-a", "old-b", "old-c", "old-d", "old-e"]],
+      ]),
+    );
+    const bundle = bundleOf(
+      { ja: { screenshots: desiredFiles }, ar: { screenshots: desiredFiles } },
+      desiredFiles,
+    );
+
+    await syncStoreListing({ bundle, locales: ["ja", "ar"], parts: everything, dashboard });
+
+    expect(dashboard.preflightCalls).toBe(1);
+    expect(dashboard.imagesByLocale.get("ja")).toEqual(["01", "02", "03", "04", "05"]);
+    expect(dashboard.imagesByLocale.get("ar")).toEqual(["01", "02", "03", "04", "05"]);
+    expect(dashboard.globalImages).toEqual(["01", "02", "03", "04", "05"]);
+    expect(dashboard.savedLocales).toHaveLength(3);
+  });
+
+  it("leaves the shared group alone when the run did not ask for it", async () => {
+    const dashboard = new MemoryDashboard(
+      new Map([["ar", ["old-a", "old-b", "old-c", "old-d", "old-e"]]]),
+    );
+    const bundle = bundleOf({ ar: { screenshots: desiredFiles } }, desiredFiles);
+
+    await syncStoreListing({
+      bundle,
+      locales: ["ar"],
+      parts: { ...everything, global: false },
+      dashboard,
+    });
+
+    expect(dashboard.imagesByLocale.get("ar")).toEqual(["01", "02", "03", "04", "05"]);
+    expect(dashboard.globalImages).toEqual(["old-a", "old-b", "old-c", "old-d", "old-e"]);
+  });
+
+  it("syncs only the shared group, preflighting through the first language", async () => {
+    const dashboard = new MemoryDashboard();
+    const preflights: unknown[] = [];
+    dashboard.preflight = async (options: { locales: string[] }) => {
+      preflights.push(options);
+      // The real preflight leaves the first language selected.
+      dashboard.selectedLocale = options.locales[0];
+    };
+    const bundle = bundleOf({ ja: { screenshots: desiredFiles } }, desiredFiles);
+
+    await syncStoreListing({
+      bundle,
+      locales: [],
+      parts: { descriptions: false, screenshots: false, global: true },
+      dashboard,
+    });
+
+    expect(dashboard.globalImages).toEqual(["01", "02", "03", "04", "05"]);
+    expect(preflights).toEqual([{ locales: ["ja"], screenshots: true, descriptions: false }]);
+  });
+
+  it("gives a language with no screenshots of its own none, and does not touch its group", async () => {
+    const dashboard = new MemoryDashboard(new Map([["en", ["keep"]]]));
+    const bundle = bundleOf({ en: { description: { text: "English body" } } }, desiredFiles);
+
+    await syncStoreListing({ bundle, locales: ["en"], parts: everything, dashboard });
+
+    expect(dashboard.imagesByLocale.get("en")).toEqual(["keep"]);
+    expect(dashboard.globalImages).toEqual(["01", "02", "03", "04", "05"]);
+  });
+
   it("sets each description and saves only the languages that changed", async () => {
     const dashboard = new MemoryDashboard(
       new Map([
@@ -222,13 +327,15 @@ describe("store listing sync", () => {
     );
     dashboard.descriptionsByLocale.set("en", "English body");
     const progress: string[] = [];
+    const bundle = bundleOf({
+      en: { description: { text: "English body" } },
+      ja: { description: { text: "Japanese body" } },
+    });
 
     await syncStoreListing({
+      bundle,
       locales: ["en", "ja"],
-      descriptionsByLocale: new Map([
-        ["en", "English body"],
-        ["ja", "Japanese body"],
-      ]),
+      parts: { descriptions: true, screenshots: false, global: false },
       dashboard,
       onProgress: ({ locale, phase }: { locale: string; phase: string }) =>
         progress.push(`${locale} ${phase}`),
@@ -241,23 +348,19 @@ describe("store listing sync", () => {
 
   it("leaves screenshots alone in a descriptions-only run", async () => {
     const dashboard = new MemoryDashboard(new Map([["en", ["old-a"]]]));
+    const bundle = bundleOf(
+      { en: { description: { text: "English body" }, screenshots: desiredFiles } },
+      desiredFiles,
+    );
 
     await syncStoreListing({
+      bundle,
       locales: ["en"],
-      descriptionsByLocale: new Map([["en", "English body"]]),
+      parts: { descriptions: true, screenshots: false, global: false },
       dashboard,
     });
 
     expect(dashboard.calls).toEqual(["description en"]);
     expect(dashboard.globalImages).toEqual(["old-a", "old-b", "old-c", "old-d", "old-e"]);
-  });
-
-  it("refuses to start a locale whose description was not loaded", async () => {
-    const dashboard = new MemoryDashboard();
-
-    await expect(
-      syncStoreListing({ locales: ["ar"], descriptionsByLocale: new Map(), dashboard }),
-    ).rejects.toThrow(/No validated store description found for ar/);
-    expect(dashboard.calls).toEqual([]);
   });
 });
