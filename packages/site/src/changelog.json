@@ -10,7 +10,8 @@
         "kind": "fixed",
         "text": "When tabless farming falls back to a watch tab, Lurkloot now tries tabless again after 10 minutes, then after 20, instead of keeping the tab open until the channel changes. If tabless keeps failing, it stays on the tab after the third fallback."
       }
-    ]
+    ],
+    "date": "2026-10-22"
   },
   {
     "version": "1.18.0",
