@@ -65,7 +65,7 @@ jobs:
           persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
-          version: 12.14.0
+          version: 12.15.0
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -130,7 +130,7 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: release-assets/lurkloot-*
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

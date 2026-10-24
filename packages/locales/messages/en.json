@@ -311,6 +311,114 @@
   "tipTranslationsAction": {
     "message": "Read the translation guide"
   },
+  "tourWelcomeTitle": {
+    "message": "Welcome to Lurkloot"
+  },
+  "tourWelcomeBody": {
+    "message": "Lurkloot farms Twitch and Kick drops for you in the background. Want a quick look at how it works? Tip: use the arrow keys to move through the tour."
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "New in Lurkloot: a quick tour"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "See what's new and what you might have missed in under a minute. Tip: use the arrow keys to move through the tour."
+  },
+  "tourStart": {
+    "message": "Show me around"
+  },
+  "tourSkip": {
+    "message": "Skip"
+  },
+  "tourNext": {
+    "message": "Next"
+  },
+  "tourBack": {
+    "message": "Back"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "Always in view"
+  },
+  "tourStatusStripBody": {
+    "message": "This strip shows what is being farmed right now and on which channel. The switch starts or stops farming on this platform."
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch and Kick"
+  },
+  "tourPlatformBody": {
+    "message": "Switch platforms here. Each one has its own queue, games and watchlist."
+  },
+  "tourQueueOrderTitle": {
+    "message": "How the queue is ordered"
+  },
+  "tourQueueOrderBody": {
+    "message": "Pinned campaigns come first, then your favourite games, then the rest in the order you pick under Then by. Click a campaign to expand it and see its rewards and progress, or to pin or exclude it."
+  },
+  "tourRewardFilterTitle": {
+    "message": "Choose what to farm"
+  },
+  "tourRewardFilterBody": {
+    "message": "Open All rewards to choose which reward types to farm, what to do with campaigns without a linked account, and whether to farm pinned campaigns only."
+  },
+  "tourCompletedTitle": {
+    "message": "Finished and expired"
+  },
+  "tourCompletedBody": {
+    "message": "Finished campaigns have every reward claimed. Expired ones ended before they were done."
+  },
+  "tourGamesTitle": {
+    "message": "Choose your games"
+  },
+  "tourGamesBody": {
+    "message": "Pick All categories to farm every game except the ones you block, or Only selected to farm just the games you tick. Star a game to put its campaigns first, or block it so it is never farmed."
+  },
+  "tourWatchlistTitle": {
+    "message": "Idle Watchlist"
+  },
+  "tourWatchlistBody": {
+    "message": "When there are no drops to farm, Lurkloot watches these channels, so you keep earning channel points on Twitch and your daily rewards and watch streak on Kick. Watch-source priority in Settings decides when they are watched."
+  },
+  "tourExtensionsTitle": {
+    "message": "Twitch Extensions"
+  },
+  "tourExtensionsBody": {
+    "message": "Some games hand out rewards through Twitch Extensions, like NoPixel and Fortnite. Switch each one on to farm those too."
+  },
+  "tourKickProgressTitle": {
+    "message": "Your Kick level"
+  },
+  "tourKickProgressBody": {
+    "message": "On Kick, this pill shows your viewer level, how close you are to the next one and your daily watch streak."
+  },
+  "tourKickChallengesTitle": {
+    "message": "Daily challenges"
+  },
+  "tourKickChallengesBody": {
+    "message": "Lurkloot can claim Kick's daily challenge rewards for you. Turn it on or off here."
+  },
+  "tourActivityTitle": {
+    "message": "What Lurkloot did"
+  },
+  "tourActivityBody": {
+    "message": "Activity lists every claim, channel switch and finished campaign, so you can see what happened while you were away."
+  },
+  "tourSettingsTitle": {
+    "message": "Useful settings"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot is highly configurable and available in 17 languages. Use the search bar to find a specific setting. This is also where you reset Lurkloot, or export and import your settings to share them between computers and browsers."
+  },
+  "tourDoneTitle": {
+    "message": "You're set! Let's get farming these drops!"
+  },
+  "tourDoneBody": {
+    "message": "Sign in to Twitch or Kick on their official websites in this browser. Lurkloot never asks for your credentials. Then switch on the platform you want to farm (or both)."
+  },
+  "tourFinish": {
+    "message": "Let's go!"
+  },
   "noCampaigns": {
     "message": "No campaigns discovered yet."
   },

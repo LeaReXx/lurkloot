@@ -311,6 +311,114 @@
   "tipTranslationsAction": {
     "message": "اقرأ دليل الترجمة"
   },
+  "tourWelcomeTitle": {
+    "message": "مرحبًا بك في Lurkloot"
+  },
+  "tourWelcomeBody": {
+    "message": "يفارم Lurkloot جوائز Twitch وKick لك في الخلفية. هل تريد جولة سريعة لمعرفة طريقة عمله؟ نصيحة: استخدم مفاتيح الأسهم للتنقل خلال الجولة."
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "Lurkloot الجديد: جولة سريعة"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "اكتشف ما الجديد وما قد يكون فاتك في أقل من دقيقة. نصيحة: استخدم مفاتيح الأسهم للتنقل خلال الجولة."
+  },
+  "tourStart": {
+    "message": "أرني كيف يعمل"
+  },
+  "tourSkip": {
+    "message": "تخطّي"
+  },
+  "tourNext": {
+    "message": "التالي"
+  },
+  "tourBack": {
+    "message": "السابق"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "دائمًا في الواجهة"
+  },
+  "tourStatusStripBody": {
+    "message": "يعرض هذا الشريط ما يُفارَم الآن وعلى أي قناة. ويبدأ المفتاح الفارم على هذه المنصة أو يوقفه."
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch وKick"
+  },
+  "tourPlatformBody": {
+    "message": "بدّل بين المنصات من هنا. لكل منصة قائمة انتظار وألعاب وقائمة مشاهدة خاصة بها."
+  },
+  "tourQueueOrderTitle": {
+    "message": "كيف تُرتَّب قائمة الانتظار"
+  },
+  "tourQueueOrderBody": {
+    "message": "تأتي الحملات المثبتة أولًا، ثم ألعابك المفضلة، ثم بقية الحملات حسب الترتيب الذي تختاره ضمن «ثم حسب». انقر على حملة لتوسيعها وترى مكافآتها وتقدمها، أو لتثبيتها أو استبعادها."
+  },
+  "tourRewardFilterTitle": {
+    "message": "اختر ما ستفارمه"
+  },
+  "tourRewardFilterBody": {
+    "message": "افتح «كل المكافآت» لتختار أنواع المكافآت التي تُفارَم، وما يحدث للحملات دون حساب مرتبط، وما إذا كانت الحملات المثبتة وحدها تُفارَم."
+  },
+  "tourCompletedTitle": {
+    "message": "المنتهية والمنتهية الصلاحية"
+  },
+  "tourCompletedBody": {
+    "message": "الحملات المنتهية حصلت على كل مكافآتها. أما المنتهية الصلاحية فقد انتهت قبل أن تكتمل."
+  },
+  "tourGamesTitle": {
+    "message": "اختر ألعابك"
+  },
+  "tourGamesBody": {
+    "message": "اختر «كل الفئات» لتُفارَم كل لعبة ما عدا التي تحظرها، أو «المحددة فقط» لتُفارَم الألعاب التي تحددها فقط. نجِّم لعبة لتقديم حملاتها أولًا، أو احظرها حتى لا تُفارَم أبدًا."
+  },
+  "tourWatchlistTitle": {
+    "message": "قائمة الانتظار للمشاهدة"
+  },
+  "tourWatchlistBody": {
+    "message": "عندما لا تكون هناك جوائز لتُفارَم، يشاهد Lurkloot هذه القنوات، فتواصل كسب نقاط القناة على Twitch، وجوائزك اليومية وسلسلة المشاهدة على Kick. ويحدد ترتيب أولوية المصادر في الإعدادات متى تُشاهَد."
+  },
+  "tourExtensionsTitle": {
+    "message": "إضافات Twitch"
+  },
+  "tourExtensionsBody": {
+    "message": "تمنح بعض الألعاب مكافآت عبر إضافات Twitch، مثل NoPixel وFortnite. فعّل كل إضافة لتُفارَم هذه المكافآت أيضًا."
+  },
+  "tourKickProgressTitle": {
+    "message": "مستواك في Kick"
+  },
+  "tourKickProgressBody": {
+    "message": "على Kick، تعرض هذه الكبسولة مستواك كمشاهد، ومدى قربك من المستوى التالي، وسلسلة مشاهدتك اليومية."
+  },
+  "tourKickChallengesTitle": {
+    "message": "التحديات اليومية"
+  },
+  "tourKickChallengesBody": {
+    "message": "يستطيع Lurkloot أن يطالب بمكافآت تحديات Kick اليومية لك. شغّلها أو أوقفها من هنا."
+  },
+  "tourActivityTitle": {
+    "message": "ما الذي فعله Lurkloot"
+  },
+  "tourActivityBody": {
+    "message": "يسرد النشاط كل مطالبة وتبديل للقنوات وكل حملة منتهية، لترى ما حدث أثناء غيابك."
+  },
+  "tourSettingsTitle": {
+    "message": "إعدادات مفيدة"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot قابل للتخصيص بدرجة كبيرة ومتاح بـ 17 لغة. استخدم شريط البحث للعثور على إعداد معين. ومن هنا أيضًا يمكنك إعادة ضبط Lurkloot، أو تصدير إعداداتك واستيرادها لمشاركتها بين الحواسيب والمتصفحات."
+  },
+  "tourDoneTitle": {
+    "message": "أنت جاهز! هيا نفارم هذه الجوائز!"
+  },
+  "tourDoneBody": {
+    "message": "سجّل الدخول إلى Twitch أو Kick عبر موقعيهما الرسميين في هذا المتصفح. لن يطلب Lurkloot بيانات اعتمادك أبدًا. ثم فعّل المنصة التي تريد فارمها (أو كلتيهما)."
+  },
+  "tourFinish": {
+    "message": "هيا بنا!"
+  },
   "noCampaigns": {
     "message": "لم يتم اكتشاف أي حملات بعد."
   },

@@ -56,7 +56,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.0
-        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core:
     dependencies:
@@ -102,10 +102,10 @@ importers:
         version: 1.2.2(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))(wxt@0.20.27(@types/node@24.19.2)(jiti@2.7.0)(rolldown@1.2.15)(rollup@4.62.2)(supports-color@10.2.2)(yaml@2.9.1))
       lucide-react:
         specifier: ^1.0.0
-        version: 1.59.0(@types/react@19.3.0)(react@19.3.1)
+        version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
       motion:
         specifier: ^14.0.0
-        version: 14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.2.7
         version: 19.3.1
@@ -127,7 +127,7 @@ importers:
         version: 4.3.3(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
       '@types/chrome':
         specifier: ^0.3.0
-        version: 0.3.5
+        version: 0.3.6
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
@@ -142,10 +142,10 @@ importers:
         version: 6.2.6
       happy-dom:
         specifier: ^21.0.0
-        version: 21.0.3
+        version: 21.0.4
       linkedom:
-        specifier: 0.18.13
-        version: 0.18.13
+        specifier: 0.18.14
+        version: 0.18.14
       playwright:
         specifier: ^1.61.0
         version: 1.64.1
@@ -160,7 +160,7 @@ importers:
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)
       vitest:
         specifier: ^5.0.0
-        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/locales:
     dependencies:
@@ -200,10 +200,10 @@ importers:
         version: link:../shared
       lucide-react:
         specifier: ^1.0.0
-        version: 1.59.0(@types/react@19.3.0)(react@19.3.1)
+        version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
       motion:
         specifier: ^14.0.0
-        version: 14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.2.7
         version: 19.3.1
@@ -270,13 +270,13 @@ importers:
         version: 1.3.27(react@19.3.1)
       lucide-react:
         specifier: ^1.0.0
-        version: 1.59.0(@types/react@19.3.0)(react@19.3.1)
+        version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
       marked:
         specifier: ^18.0.5
         version: 18.1.1
       motion:
         specifier: ^14.0.0
-        version: 14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.2.7
         version: 19.3.1
@@ -298,7 +298,7 @@ importers:
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
       wrangler:
         specifier: ^4.103.0
-        version: 4.151.2(@types/node@24.19.2)
+        version: 4.152.0(@types/node@24.19.2)
 
   packages/store-sync:
     dependencies:
@@ -314,12 +314,15 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.0
-        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
 packages:
 
   '@1natsu/wait-element@4.2.0':
     resolution: {integrity: sha512-Om0Q+WE9mNrpY4AwMTvkFiYHv8VM7TML3PvOqXy+w6kAjLjKhGYHYX+305+a6J8RVpds9s7IF2Z5aOPYwULFNw==}
+
+  '@acemir/cssom@0.9.32':
+    resolution: {integrity: sha512-OijrAUu7rrJhSIoHNg6LMPS5e344nwUHA+1EFYYjrh64D+GmytUsfBQjci45TjT+rd5Spsp8B5xsZDT+TgyXXQ==}
 
   '@aklinker1/rollup-plugin-visualizer@5.12.0':
     resolution: {integrity: sha512-X24LvEGw6UFmy0lpGJDmXsMyBD58XmX1bbwsaMLhNoM+UMQfQ3b2RtC+nz4b/NoRK5r6QJSKJHBNVeUdwqybaQ==}
@@ -1649,8 +1652,8 @@ packages:
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
-  '@types/chrome@0.3.5':
-    resolution: {integrity: sha512-7HYsK7xalNxzLwGrP9lkCQPAA6V56VtPpOmv2CQnBnMzX5/Hpr+Iv5fqaIOIY/H/Q6ZBksLmurWh7zXPcZ4B7Q==}
+  '@types/chrome@0.3.6':
+    resolution: {integrity: sha512-NXCrCBefCHCKMVbkaxfBQqyP766Wg85S2FQhixCCxq7AtjJwoEaja2y5NSqCzpihIi9mPqhaF5RuybTnrdYD2Q==}
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
@@ -2211,9 +2214,6 @@ packages:
     resolution: {integrity: sha512-0LrrStPOdJj+SPCCrGhzryycLjwcgUSHBtxNA8aIDxf0GLsRh1cKYhB00Gd1lDOS4yGH69+SNn13+TWbVHETFQ==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0, npm: '>=7.0.0'}
 
-  cssom@0.5.0:
-    resolution: {integrity: sha512-iKuQcq+NdHqlAcwUY0o/HL69XQrUaQdMjmStJ8JFmUaiiQErlhrmuigkg/CU4E2J0IyUKUrMAgl36TvN67MqTw==}
-
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
@@ -2510,8 +2510,8 @@ packages:
     resolution: {integrity: sha512-8e1++BCiTzUno9v5IZ2J6bv4RU+3UKDmqWUQD0MIMVCd9AdhWkO1gw57oo1mNEX1dMq2EGI+FbWz4B92pscSQg==}
     engines: {node: '>= 18'}
 
-  framer-motion@14.3.0:
-    resolution: {integrity: sha512-d8WCrU0ZQn7ukKMykCsDyIOwb/taZeDqqrDBK0du5GO0AO/ynz8fdR/LIIz9Pyy3n3tGwrneR+n0egyrrLa3fw==}
+  framer-motion@14.6.0:
+    resolution: {integrity: sha512-MzBgZxGgoHPfSLEXmo4o5XlZvb+nVRFdHtGjVhm6LMIEJKTt/8hNO023euL5mYyzc8llV/hQTfjnN68tNRHalw==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -2593,8 +2593,8 @@ packages:
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
 
-  happy-dom@21.0.3:
-    resolution: {integrity: sha512-PesNgu5BnIEmAwzKGewB3K1ORFeznFZJ4JrRz89ea1wkHnxskdpzX9sN/+zb4KO6k8oSMhyJSj/cwXAFrYBBNA==}
+  happy-dom@21.0.4:
+    resolution: {integrity: sha512-tFm+GaLBgo6o0awHnvHaNoraVo27qJ+2tZEtZ+cIa08hXbeitrxAJajLI05hsUy/2/YTKcUjQYzHe5mCcraLBw==}
     engines: {node: '>=20.0.0'}
 
   has-symbols@1.1.0:
@@ -2975,8 +2975,8 @@ packages:
     resolution: {integrity: sha512-wM1+Z03eypVAVUCE7QdSqpVIvelbOakn1M0bPDoA4SGWPx3sNDVUiMo3L6To6WWGClB7VyXnhQ4Sn7gxiJbE6A==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  linkedom@0.18.13:
-    resolution: {integrity: sha512-ES/o9qotMpzpN2MHs+Iq/JcVoOj8Fa5wiQYrTdFpvAnwXL0g66XHHUc9WUMk6nAlBtGsFQ24ne+SYnvnaQ2FSw==}
+  linkedom@0.18.14:
+    resolution: {integrity: sha512-BRUnkOm4YR5vo+qI3j0EbungB0vZPSCue5AdnTQRaxAGSbsOZiBFRO0rh4zlo8qXUhli8pxvnpEXDklMnlq2Rg==}
     engines: {node: '>=16'}
     peerDependencies:
       canvas: '>= 2'
@@ -3024,8 +3024,8 @@ packages:
     resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
     engines: {node: 20 || >=22}
 
-  lucide-react@1.59.0:
-    resolution: {integrity: sha512-5qgMyyCPU6OvnKpLS2t693+ZtiqA8oaSweWoUows0BLFKFf6V75m4+CptpmohZHpD5IuOVIBXHBBiv2vpLJmtw==}
+  lucide-react@1.61.0:
+    resolution: {integrity: sha512-v2SQPPPNjnr+BlhL9Spuzmo5yR+hLkftfuE4E3jaxdNPgSH0hJKPcLJBP7yAta87jQNPsSERS59PJjCJ/CorBA==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -3100,8 +3100,8 @@ packages:
     resolution: {integrity: sha512-VP79XUPxV2CigYP3jWwAUFSku2aKqBH7uTAapFWCBqutsbmDo96KY5o8uh6U+/YSIn5OxJnXp73beVkpqMIGhA==}
     engines: {node: '>=18'}
 
-  miniflare@5.20261019.0-beta:
-    resolution: {integrity: sha512-NmE6Yz7MSdjrfr3lMaMAVO55rIm3+6YXllOkJOMy6pPQITDuDeo0PYRedp7pju2olNWmrAlf1i1LIWYfGQvvuw==}
+  miniflare@5.20261019.2-beta:
+    resolution: {integrity: sha512-QNgCA/axizZ7kv7RV3nwbRoz+w4watBlwIsyXjwgYHw4eSw5BrR1F2152s3Kz+Bzy/YxjKFHrZl3LzBRbPgYoQ==}
     engines: {node: '>=22.0.0'}
 
   minimatch@3.1.5:
@@ -3113,14 +3113,14 @@ packages:
   mlly@1.8.2:
     resolution: {integrity: sha512-d+ObxMQFmbt10sretNDytwt85VrbkhhUA/JBGm1MPaWJ65Cl4wOgLaB1NYvJSZ0Ef03MMEU/0xpPMXUIQ29UfA==}
 
-  motion-dom@14.3.0:
-    resolution: {integrity: sha512-rcKO4aEJzAqDEsrH6qFzhLZxs7bNqZpiUEuEATz9LaRwt6dG7hZEbcFUSHNR8NECaKYM0Iuw6Iv6NpWEGXDI+w==}
+  motion-dom@14.6.0:
+    resolution: {integrity: sha512-lIojTl9aYSPIkeOOSzBliy1nNvpdO3JtVzW2WgTXQlOP4ZMuJhtWO3fP7OD4TVFwlRucdvxlDSMkL+fEQnQ52A==}
 
-  motion-utils@14.1.1:
-    resolution: {integrity: sha512-3VvN5Uvf8B6qG+OfOui6Nht5EWp+vLuU3IqcAj7ItZGKqtmTjCebl5sGZF7/08gEHRnEl1AP/fIwbcEyVrcQGQ==}
+  motion-utils@14.6.0:
+    resolution: {integrity: sha512-bZJo2AmQ2aOFkaato6VXrTbkPG0XhMzivWUWSaI59pxyllj8QMQUFZ84MYRQnPkK+7dr4KldyJwF2+RM0sdq/w==}
 
-  motion@14.3.0:
-    resolution: {integrity: sha512-yh/nHYjikl68+FTxAMywFYzzj21/oGY7RGCfkqN5zpuT1rk3rp0lKfVU8EUq0A64qQeGnxuKUJWP85MipqdLBw==}
+  motion@14.6.0:
+    resolution: {integrity: sha512-qqaZbyubgk7x3zxjPgP1l3Br/KQXol/IIV1uqb358SoN4ApcqNuV7+wyDPg/XLErmuyQL5lL8JVI/fOmDsmBKQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -4030,8 +4030,8 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
-  wrangler@4.151.2:
-    resolution: {integrity: sha512-yIT5Q08eVP2ZSE4XHGZ81Y+Y1b25uzp7LANwV2siaEt/O7TpeiFiEih/xHwARHGQo8sufs2ZaILGxCccHgjQPg==}
+  wrangler@4.152.0:
+    resolution: {integrity: sha512-lmXTF1sCDEqBaEMpreGczvg/x3AIh1d/qxc4BN7utQ4jEDwdA4YG0L6kr3ev0TtVLHRb6QLySNAOAunwn+dHeA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -4161,6 +4161,8 @@ snapshots:
     dependencies:
       defu: 6.1.7
       many-keys-map: 3.0.3
+
+  '@acemir/cssom@0.9.32': {}
 
   '@aklinker1/rollup-plugin-visualizer@5.12.0(rollup@4.62.2)':
     dependencies:
@@ -5145,9 +5147,8 @@ snapshots:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
 
-  '@types/chrome@0.3.5':
+  '@types/chrome@0.3.6':
     dependencies:
-      '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
 
   '@types/deep-eql@4.0.2': {}
@@ -5715,8 +5716,6 @@ snapshots:
     dependencies:
       css-tree: 2.2.1
 
-  cssom@0.5.0: {}
-
   csstype@3.2.3: {}
 
   cycletls@2.0.5:
@@ -6009,10 +6008,10 @@ snapshots:
 
   formdata-node@6.0.3: {}
 
-  framer-motion@14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+  framer-motion@14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
-      motion-dom: 14.3.0
-      motion-utils: 14.1.1
+      motion-dom: 14.6.0
+      motion-utils: 14.6.0
       tslib: 2.8.1
     optionalDependencies:
       react: 19.3.1
@@ -6098,7 +6097,7 @@ snapshots:
       ufo: 1.6.4
       uncrypto: 0.1.3
 
-  happy-dom@21.0.3:
+  happy-dom@21.0.4:
     dependencies:
       '@types/node': 24.19.2
       '@types/whatwg-mimetype': 3.0.2
@@ -6405,10 +6404,10 @@ snapshots:
 
   lines-and-columns@2.0.4: {}
 
-  linkedom@0.18.13:
+  linkedom@0.18.14:
     dependencies:
+      '@acemir/cssom': 0.9.32
       css-select: 7.0.0
-      cssom: 0.5.0
       html-escaper: 3.0.3
       htmlparser2: 10.1.0
       uhyphen: 0.2.0
@@ -6453,7 +6452,7 @@ snapshots:
 
   lru-cache@11.5.2: {}
 
-  lucide-react@1.59.0(@types/react@19.3.0)(react@19.3.1):
+  lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1):
     dependencies:
       react: 19.3.1
     optionalDependencies:
@@ -6530,7 +6529,7 @@ snapshots:
 
   mimic-function@5.0.1: {}
 
-  miniflare@5.20261019.0-beta(@types/node@24.19.2):
+  miniflare@5.20261019.2-beta(@types/node@24.19.2):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.19.2)
@@ -6556,15 +6555,15 @@ snapshots:
       pkg-types: 1.3.1
       ufo: 1.6.4
 
-  motion-dom@14.3.0:
+  motion-dom@14.6.0:
     dependencies:
-      motion-utils: 14.1.1
+      motion-utils: 14.6.0
 
-  motion-utils@14.1.1: {}
+  motion-utils@14.6.0: {}
 
-  motion@14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+  motion@14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
-      framer-motion: 14.3.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      framer-motion: 14.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tslib: 2.8.1
     optionalDependencies:
       react: 19.3.1
@@ -7411,7 +7410,7 @@ snapshots:
     optionalDependencies:
       vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
 
-  vitest@5.0.5(@types/node@24.19.2)(happy-dom@21.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.5(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
@@ -7429,11 +7428,11 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 24.19.2
-      happy-dom: 21.0.3
+      happy-dom: 21.0.4
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.5(@types/node@24.19.2)(happy-dom@21.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.5(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -7451,7 +7450,7 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 24.19.2
-      happy-dom: 21.0.3
+      happy-dom: 21.0.4
     transitivePeerDependencies:
       - msw
 
@@ -7518,13 +7517,13 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20261019.1
       '@cloudflare/workerd-windows-64': 1.20261019.1
 
-  wrangler@4.151.2(@types/node@24.19.2):
+  wrangler@4.152.0(@types/node@24.19.2):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261019.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
-      miniflare: 5.20261019.0-beta(@types/node@24.19.2)
+      miniflare: 5.20261019.2-beta(@types/node@24.19.2)
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
       workerd: 1.20261019.1
@@ -7588,7 +7587,7 @@ snapshots:
       is-wsl: 3.1.1
       json5: 2.2.3
       jszip: 3.10.1
-      linkedom: 0.18.13
+      linkedom: 0.18.14
       magicast: 0.5.3
       nano-spawn: 2.1.0
       nanospinner: 1.2.2

@@ -217,6 +217,10 @@ export function variantShowsPopup(variant: ScreenshotVariant): variant is Screen
   return variant.layout !== "updated";
 }
 
+/** Who the first-run tour is offered to: someone who just installed, or an
+ * existing user who has just updated. Only the welcome copy differs. */
+export type OnboardingAudience = "new" | "returning";
+
 export interface PopupAdapter {
   requestTwitchExtensionPermission?(provider: TwitchExtensionProviderId): Promise<boolean>;
   version: string;
@@ -231,6 +235,10 @@ export interface PopupAdapter {
   getPendingChangelogVersion?(): Promise<string | undefined>;
   dismissPendingChangelogVersion?(): Promise<void>;
   changelogUrl?(version: string): string;
+  // Optional first-run tour hooks. Demo/site hosts and the in-page panel omit
+  // these, which keeps the tour out of them.
+  getPendingOnboarding?(): Promise<OnboardingAudience | null>;
+  dismissPendingOnboarding?(): Promise<void>;
   // Optional: download/persist an exported credential blob for the headless CLI.
   // Only the live extension implements it (the demo omits it, hiding the action).
   exportCredentials?(blob: CliCredentialBlob): void;

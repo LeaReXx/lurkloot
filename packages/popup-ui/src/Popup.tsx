@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Clock3, RotateCcw, Settings as SettingsIcon } from "lucide-react";
 import type {
@@ -13,6 +13,7 @@ import type { ActivityHistoryRecord } from "@lurkloot/shared/events";
 import type {
   CategorySelection,
   ExtensionSettings,
+  LanguageOverride,
   Platform,
   RewardKind,
   TwitchExtensionProviderId,
@@ -53,7 +54,7 @@ import type {
   ScreenshotVariant,
   TFunction,
 } from "./types";
-import { variantShowsPopup } from "./types";
+import { type OnboardingAudience, variantShowsPopup } from "./types";
 import {
   campaignViewFromCampaign,
   rewardKindCounts as countRewardKinds,
@@ -105,15 +106,49 @@ import { changeTwitchExtensionEnabled, TwitchExtensionView } from "./twitchExten
 import { SettingsView } from "./settings";
 import { TipsBanner } from "./tips";
 import { TooltipScope } from "./tooltip";
+import { createDemoPopupAdapter } from "./demo";
+import { OnboardingOverlay } from "./onboardingTour";
+import { dismissesForGood, TOUR_STEPS, type TourAction, tourReducer } from "./onboardingTour.logic";
 
 export function screenshotVariant(id: string | null | undefined): ScreenshotVariant {
   return SCREENSHOT_VARIANTS[id ?? "drops"] ?? SCREENSHOT_VARIANTS.drops;
+}
+
+// While the tour runs the frame underneath only shows: its overlay, the one
+// thing left interactive, sits above it. Without a tour there is no wrapper,
+// so the frame's DOM (which the store artwork styles as `main > nav`) is as it
+// always was.
+function InertDuringTour({
+  touring,
+  children,
+}: {
+  touring: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
+  if (!touring) return <>{children}</>;
+  return (
+    <div inert className="contents">
+      {children}
+    </div>
+  );
 }
 
 function isPlatform(value: unknown): value is Platform {
   return value === "twitch" || value === "kick";
 }
 
+/** What the onboarding tour shows: the destination it points at, and the
+ * overlay it draws over the frame, which itself stays inert underneath. */
+export interface PopupTourFrame {
+  view: PopupView;
+  platform: Platform;
+  settingsFocus?: string;
+  overlay: React.ReactNode;
+}
+
+/** The popup. A host that can say whether onboarding is pending (only the
+ * extension's toolbar popup) gets the onboarding tour on top of it; previews
+ * and every other host get the frame alone, exactly as before. */
 export function Popup({
   adapter,
   initialState,
@@ -121,7 +156,150 @@ export function Popup({
   adapter: PopupAdapter;
   initialState?: PopupInitialState;
 }): React.ReactElement {
+  if (initialState?.preview || !adapter.getPendingOnboarding) {
+    return <PopupFrame adapter={adapter} initialState={initialState} />;
+  }
+  return <OnboardingTourHost adapter={adapter} initialState={initialState} />;
+}
+
+// Decides whether the tour shows, and swaps the frame for a demo one while it
+// does. The tour frame talks only to its own demo adapter, so the tour never
+// reads or writes the user's real state; the real frame mounts once it closes.
+function OnboardingTourHost({
+  adapter,
+  initialState,
+}: {
+  adapter: PopupAdapter;
+  initialState?: PopupInitialState;
+}): React.ReactElement {
+  const [phase, dispatch] = useReducer(tourReducer, { kind: "loading" });
+  const [audience, setAudience] = useState<OnboardingAudience>("new");
+  // A returning user may already have picked a language; the tour speaks it.
+  const [languageOverride, setLanguageOverride] = useState<LanguageOverride>("browser");
+  // Asked once per popup: a later identity change must not re-arm a tour the
+  // user has just dismissed while the dismissal is still being stored.
+  const pendingAdapterRef = useRef(adapter);
+  useEffect(() => {
+    let cancelled = false;
+    const answer = (pending: OnboardingAudience | null, override?: LanguageOverride) => {
+      if (cancelled) return;
+      if (pending) {
+        setAudience(pending);
+        setLanguageOverride(override ?? "browser");
+      }
+      dispatch(pending ? "arm" : "disarm");
+    };
+    const storedOverride = () =>
+      Promise.resolve()
+        .then(() => pendingAdapterRef.current.getStorage("settings"))
+        .then(
+          (stored) =>
+            mergeSettings(stored.settings as Partial<ExtensionSettings> | undefined)
+              .languageOverride,
+          () => undefined,
+        );
+    Promise.resolve()
+      .then(() => pendingAdapterRef.current.getPendingOnboarding!())
+      .then(
+        async (pending) => answer(pending, pending ? await storedOverride() : undefined),
+        () => answer(null),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onAction = useCallback(
+    (action: TourAction) => {
+      dispatch(action);
+      if (!dismissesForGood(action)) return;
+      // The tour closes whether or not the dismissal is stored.
+      Promise.resolve()
+        .then(() => adapter.dismissPendingOnboarding?.())
+        .catch(() => undefined);
+    },
+    [adapter],
+  );
+
+  // A factory reset brings a fresh install's tour back, in the same popup.
+  const wrappedAdapter = useMemo<PopupAdapter>(() => {
+    const reset = adapter.resetExtension;
+    if (!reset) return adapter;
+    return {
+      ...adapter,
+      resetExtension: async () => {
+        const snapshot = await reset.call(adapter);
+        setAudience("new");
+        setLanguageOverride("browser");
+        dispatch("arm");
+        return snapshot;
+      },
+    };
+  }, [adapter]);
+
+  // One demo adapter for the whole tour: a new one would re-run the frame's
+  // snapshot load and send it back to Twitch mid-step.
+  const tourAdapter = useMemo(
+    () => createDemoPopupAdapter({ scenario: "tour", version: adapter.version }),
+    [adapter.version],
+  );
+
+  // The loading shell, not the real frame: the real frame would flash the
+  // user's data before a tour, and rendering nothing sizes the popup to zero.
+  if (phase.kind === "loading")
+    return <PopupLoadingShell dir="ltr">{adapter.getMessage("loading")}</PopupLoadingShell>;
+  if (phase.kind === "hidden") {
+    return <PopupFrame key="real" adapter={wrappedAdapter} initialState={initialState} />;
+  }
+
+  const step = phase.kind === "step" ? TOUR_STEPS[phase.index] : undefined;
+  const locale = effectiveLocale(languageOverride, adapter.getUiLanguage());
+  return (
+    <PopupFrame
+      key="tour"
+      adapter={tourAdapter}
+      initialState={{ preview: true, locale }}
+      tour={{
+        view: step?.view ?? "queue",
+        platform: step?.platform ?? "twitch",
+        ...(step?.settingsFocus ? { settingsFocus: step.settingsFocus } : {}),
+        overlay: <OnboardingOverlay phase={phase} audience={audience} onAction={onAction} />,
+      }}
+    />
+  );
+}
+
+// The popup's size and surface before there is anything to show: the frame's
+// own loading state, and the tour host's while it asks whether a tour is due.
+function PopupLoadingShell({
+  dir,
+  children,
+}: {
+  dir: "ltr" | "rtl";
+  children?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <main
+      dir={dir}
+      className="grid h-[600px] w-[720px] max-w-full place-items-center border border-zinc-200 bg-zinc-50 text-sm font-semibold text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
+      data-platform="twitch"
+    >
+      {children}
+    </main>
+  );
+}
+
+export function PopupFrame({
+  adapter,
+  initialState,
+  tour,
+}: {
+  adapter: PopupAdapter;
+  initialState?: PopupInitialState;
+  tour?: PopupTourFrame;
+}): React.ReactElement {
   const preview = initialState?.preview ?? false;
+  const touring = Boolean(tour);
   const initialVariant = initialState?.variant ?? screenshotVariant("drops");
   // Live demo channels for any preview that opens on the watchlist, whether the
   // shot or a `view` override puts it there.
@@ -297,7 +475,8 @@ export function Popup({
   }, [adapter, preview]);
 
   useEffect(() => {
-    if (!activityOpen || preview || clearingActivity) return;
+    // The tour's demo answers getActivity, so its Activity step has events.
+    if (!activityOpen || (preview && !touring) || clearingActivity) return;
     let cancelled = false;
     const requestScope = activityRequestScopeRef.current;
     const refresh = () => {
@@ -337,7 +516,7 @@ export function Popup({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [activityOpen, activityRequestGeneration, adapter, clearingActivity, preview]);
+  }, [activityOpen, activityRequestGeneration, adapter, clearingActivity, preview, touring]);
 
   useEffect(() => {
     if (
@@ -589,6 +768,16 @@ export function Popup({
     setView((current: PopupView) => viewForPlatform(current, nextPlatform));
     if (!preview) void adapter.setStorage({ [SELECTED_PLATFORM_KEY]: nextPlatform });
   }
+
+  // The tour drives the frame: platform first, since switching platform can
+  // move the view, then the view. It waits for the snapshot, whose load sets
+  // the stored platform and would otherwise undo the tour's.
+  const snapshotLoaded = snapshot !== null;
+  useEffect(() => {
+    if (!tour || !snapshotLoaded) return;
+    if (tour.platform !== platform) selectPlatform(tour.platform);
+    changeView(tour.view, tour.settingsFocus);
+  }, [tour?.platform, tour?.view, tour?.settingsFocus, snapshotLoaded]);
 
   // Every rail destination goes through here so leaving Activity always settles
   // its in-flight requests, and entering Settings always rearms the one-shot
@@ -876,13 +1065,7 @@ export function Popup({
     return (
       <PopupRuntimeContext.Provider value={runtimeValue}>
         <I18nContext.Provider value={i18nValue}>
-          <main
-            dir={dir}
-            className="grid h-[600px] w-[720px] max-w-full place-items-center border border-zinc-200 bg-zinc-50 text-sm font-semibold text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-            data-platform="twitch"
-          >
-            {t("loading")}
-          </main>
+          <PopupLoadingShell dir={dir}>{t("loading")}</PopupLoadingShell>
         </I18nContext.Provider>
       </PopupRuntimeContext.Provider>
     );
@@ -1127,414 +1310,426 @@ export function Popup({
             // re-measure the whole document to resize its window.
             className="@container relative flex h-[600px] w-[720px] max-w-full overflow-clip [contain:strict] border border-zinc-200/80 bg-zinc-50 shadow-2xl shadow-black/30 dark:border-zinc-800 dark:bg-zinc-950"
           >
-            <TooltipScope>
-              <WorkspaceRail
-                view={view}
-                platform={platform}
-                counts={railCounts}
-                sourceOrder={sourceOrder}
-                liveSource={liveSource}
-                presentation={automationPresentationByPlatform}
-                version={adapter.version}
-                onViewChange={changeView}
-                onPlatformChange={selectPlatform}
-                onOpenInventory={() =>
-                  openHttpsLink(PLATFORM_INVENTORY_URLS[platform], adapter.openLink)
-                }
-                onOpenChangelog={
-                  adapter.changelogUrl
-                    ? () => openHttpsLink(adapter.changelogUrl!(adapter.version), adapter.openLink)
-                    : undefined
-                }
-              />
-
-              <div className="flex min-w-0 flex-1 flex-col">
-                {/* The status strip sits above every view, so what is being farmed is
-            never more than a glance away — including from Settings, where the
-            old header hid it entirely. */}
-                <StatusStrip
+            <InertDuringTour touring={touring}>
+              <TooltipScope>
+                <WorkspaceRail
+                  view={view}
                   platform={platform}
-                  presentation={presentation}
-                  campaign={activeCampaign}
-                  farmingChannel={farmingChannel}
-                  supplementalName={
-                    session.supplementalWatch
-                      ? t(session.supplementalWatch.id === "nopixel" ? "navNoPixel" : "navFortnite")
+                  counts={railCounts}
+                  sourceOrder={sourceOrder}
+                  liveSource={liveSource}
+                  presentation={automationPresentationByPlatform}
+                  version={adapter.version}
+                  onViewChange={changeView}
+                  onPlatformChange={selectPlatform}
+                  onOpenInventory={() =>
+                    openHttpsLink(PLATFORM_INVENTORY_URLS[platform], adapter.openLink)
+                  }
+                  onOpenChangelog={
+                    adapter.changelogUrl
+                      ? () =>
+                          openHttpsLink(adapter.changelogUrl!(adapter.version), adapter.openLink)
                       : undefined
                   }
-                  chatPresence={snapshot.state.chatPresence?.[platform]}
-                  accountProgress={
-                    <AccountProgressSlot
-                      poll={snapshot.state.accountProgress?.[platform]}
-                      signedIn={snapshot.state.authHealth[platform].status === "healthy"}
-                    />
-                  }
-                  onCampaignClick={session.supplementalWatch ? undefined : onFarmingTitleClick}
-                  onResume={resumeAfterManualClose}
-                  enabled={automation[platform]}
-                  pending={automationPending[platform]}
-                  onToggle={(value) => setAutomation(platform, value)}
                 />
 
-                {/* The view's title and its own controls share one row: a view hands
-            them to ViewToolbar, which moves them into the slot here. */}
-                <div className="flex shrink-0 items-center gap-2 px-3 pt-2.5">
-                  <h1 className="font-display shrink-0 truncate text-[15px] font-bold tracking-[-0.01em] text-zinc-900 dark:text-zinc-50">
-                    {viewTitle}
-                  </h1>
-                  <div
-                    ref={setToolbarSlot}
-                    data-view-toolbar
-                    className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+                <div className="flex min-w-0 flex-1 flex-col">
+                  {/* The status strip sits above every view, so what is being farmed is
+            never more than a glance away — including from Settings, where the
+            old header hid it entirely. */}
+                  <StatusStrip
+                    platform={platform}
+                    presentation={presentation}
+                    campaign={activeCampaign}
+                    farmingChannel={farmingChannel}
+                    supplementalName={
+                      session.supplementalWatch
+                        ? t(
+                            session.supplementalWatch.id === "nopixel"
+                              ? "navNoPixel"
+                              : "navFortnite",
+                          )
+                        : undefined
+                    }
+                    chatPresence={snapshot.state.chatPresence?.[platform]}
+                    accountProgress={
+                      <AccountProgressSlot
+                        poll={snapshot.state.accountProgress?.[platform]}
+                        signedIn={snapshot.state.authHealth[platform].status === "healthy"}
+                      />
+                    }
+                    onCampaignClick={session.supplementalWatch ? undefined : onFarmingTitleClick}
+                    onResume={resumeAfterManualClose}
+                    enabled={automation[platform]}
+                    pending={automationPending[platform]}
+                    onToggle={(value) => setAutomation(platform, value)}
                   />
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <IconButton
-                      label={t("refreshSchedule")}
-                      onClick={() => void refreshNow()}
-                      disabled={refreshing}
-                    >
-                      <RotateCcw size={16} className={cn(refreshing && "animate-spin")} />
-                    </IconButton>
-                  </div>
-                </div>
 
-                <ViewToolbarSlotContext.Provider value={toolbarSlot}>
-                  <div
-                    id="popup-platform-panel"
-                    data-scroll-panel
-                    className="nice-scroll @container min-h-0 flex-1 overflow-y-auto text-zinc-700 dark:text-zinc-300"
-                  >
-                    <div className="space-y-2 p-3 pt-2">
-                      {/* The view itself is swapped outright rather than cross-faded: the
+                  {/* The view's title and its own controls share one row: a view hands
+            them to ViewToolbar, which moves them into the slot here. */}
+                  <div className="flex shrink-0 items-center gap-2 px-3 pt-2.5">
+                    <h1 className="font-display shrink-0 truncate text-[15px] font-bold tracking-[-0.01em] text-zinc-900 dark:text-zinc-50">
+                      {viewTitle}
+                    </h1>
+                    <div
+                      ref={setToolbarSlot}
+                      data-view-toolbar
+                      className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+                    />
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <IconButton
+                        label={t("refreshSchedule")}
+                        onClick={() => void refreshNow()}
+                        disabled={refreshing}
+                      >
+                        <RotateCcw size={16} className={cn(refreshing && "animate-spin")} />
+                      </IconButton>
+                    </div>
+                  </div>
+
+                  <ViewToolbarSlotContext.Provider value={toolbarSlot}>
+                    <div
+                      id="popup-platform-panel"
+                      data-scroll-panel
+                      className="nice-scroll @container min-h-0 flex-1 overflow-y-auto text-zinc-700 dark:text-zinc-300"
+                    >
+                      <div className="space-y-2 p-3 pt-2">
+                        {/* The view itself is swapped outright rather than cross-faded: the
                 rail makes navigation frequent, and an exit animation would hold
                 the outgoing panel on screen every time. Notices below keep their
                 own enter/exit, which is where motion earns its place. */}
-                      <div className="space-y-3">
-                        <AnimatePresence initial={false}>
-                          {noticeSlot === "update" && updateNotice ? (
-                            <UpdateNotice
-                              key="update-notice"
-                              version={updateNotice.version}
-                              href={updateNotice.href}
-                              onDismiss={dismissUpdateNotice}
-                            />
-                          ) : null}
-                          {noticeSlot === "rate" ? (
-                            <RateNudge
-                              key="rate-nudge"
-                              onRate={() => void updateSettings({ rateNudgeStatus: "rated" })}
-                              onDismiss={() =>
-                                void updateSettings({ rateNudgeStatus: "dismissed" })
-                              }
-                            />
-                          ) : null}
-                          {noticeSlot === "github-star" ? (
-                            <GithubStarNudge
-                              key="github-star-nudge"
-                              onStar={() =>
-                                void updateSettings({ githubStarNudgeStatus: "starred" })
-                              }
-                              onDismiss={() =>
-                                void updateSettings({ githubStarNudgeStatus: "dismissed" })
-                              }
-                            />
-                          ) : null}
-                        </AnimatePresence>
-                        {view === "settings" ? (
-                          <SettingsView
-                            suggestions={dropCategorySuggestions}
-                            onSearchCategories={searchCategories}
-                            settings={settings}
-                            onSettingsChange={updateSettings}
-                            onExtensionEnabledChange={
-                              adapter.requestTwitchExtensionPermission
-                                ? setExtensionEnabled
-                                : undefined
-                            }
-                            onExportCredentials={exportCredentials}
-                            onExportSettings={exportSettings}
-                            onImportSettings={importSettings}
-                            onReset={resetExtension}
-                            exportConfirmationResetKey={settingsOpenGeneration}
-                            compatibilityRegistry={adapter.compatibilityRegistry}
-                            compatibilityResolution={compatibilityResolution}
-                            onOpenGames={(gamesPlatform) => {
-                              if (gamesPlatform !== platform) selectPlatform(gamesPlatform);
-                              changeView("games");
-                            }}
-                            version={adapter.version}
-                            focusGroupId={
-                              preview
-                              && variantShowsPopup(initialVariant)
-                              && initialVariant.view === "settings"
-                                ? "general.drops"
-                                : settingsFocus
-                            }
-                            showSubscriptionChoice={subscriptionChoice}
-                          />
-                        ) : view === "activity" ? (
-                          <ActivityLog
-                            activityEvents={activityStream.events}
-                            diagnosticEvents={diagnosticStream.events}
-                            platform={platform}
-                            lastTickAt={snapshot.state.lastTickAt}
-                            diagnosticLogging={settings.diagnosticLogging}
-                            showDiagnostics={showDiagnostics}
-                            hasMore={Boolean(
-                              showDiagnostics
-                                ? diagnosticStream.nextCursor
-                                : activityStream.nextCursor,
-                            )}
-                            clearArmed={clearActivityArmed}
-                            clearFailed={clearActivityFailed}
-                            loadingMore={loadingMoreActivity}
-                            clearing={clearingActivity}
-                            version={adapter.version}
-                            locale={locale}
-                            searchQuery={diagnosticSearchQuery}
-                            onSearchQueryChange={setDiagnosticSearchQuery}
-                            searchingDiagnostics={Boolean(trimmedDiagnosticSearchQuery)}
-                            onShowDiagnosticsChange={handleShowDiagnosticsChange}
-                            onLoadMore={loadMoreActivity}
-                            onClear={clearActivityHistory}
-                            writeClipboard={adapter.writeClipboard}
-                            onExportAll={adapter.downloadFile ? exportDiagnosticsLog : undefined}
-                          />
-                        ) : view === "games" ? (
-                          // Keyed by platform so a search typed on one platform, and
-                          // the results it found, cannot be added to the other's lists.
-                          <GamesPanel
-                            key={platform}
-                            platform={platform}
-                            settings={settings}
-                            suggestions={dropCategorySuggestions[platform]}
-                            campaignCounts={gameCampaignCounts}
-                            onCategoryModeChange={(categoryMode) =>
-                              void updateSettings(
-                                { platform: { [platform]: { categoryMode } } },
-                                { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                              )
-                            }
-                            onCategoriesChange={(categories) =>
-                              void updateSettings(
-                                { platform: { [platform]: { categories } } },
-                                { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                              )
-                            }
-                            onFavouritesChange={(favouriteCategories) =>
-                              void updateSettings(
-                                { platform: { [platform]: { favouriteCategories } } },
-                                { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                              )
-                            }
-                            onBlockedChange={(blockedCategories) =>
-                              void updateSettings(
-                                { platform: { [platform]: { blockedCategories } } },
-                                { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                              )
-                            }
-                            onSearchCategories={(query) => searchCategories(platform, query)}
-                          />
-                        ) : view === "watchlist" ? (
-                          // Keyed by platform so a half-typed channel cannot survive a
-                          // platform switch and land in the other platform's list.
-                          <IdleWatchlistPanel
-                            key={platform}
-                            platform={platform}
-                            streamers={screenshotWatchlist}
-                            watchOrder={settings.platform[platform].watchSourcePriority}
-                            onChangeOrder={() =>
-                              changeView("settings", `${platform}.watchSourcePriority`)
-                            }
-                            onChange={(ordered) =>
-                              updateSettings(
-                                {
-                                  platform: {
-                                    [platform]: {
-                                      idleWatchlistChannels: ordered.map((streamer) => streamer.id),
-                                    },
-                                  },
-                                },
-                                { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                              )
-                            }
-                          />
-                        ) : view === "nopixel" || view === "fortnite" ? (
-                          <TwitchExtensionView
-                            providerId={view}
-                            settings={settings}
-                            summary={snapshot.state.twitchExtensions?.[view]}
-                            chatPresence={snapshot.state.chatPresence?.twitch}
-                            active={
-                              snapshot.state.sessions.twitch.status === "watching"
-                              && snapshot.state.sessions.twitch.watchMode === "tabless"
-                              && snapshot.state.sessions.twitch.supplementalWatch?.id === view
-                            }
-                            pending={extensionPending}
-                            onEnabledChange={(enabled) => changeExtensionEnabled(view, enabled)}
-                            onOptionChange={(enabled) =>
-                              void updateSettings(
-                                view === "nopixel"
-                                  ? { twitchExtensions: { nopixel: { autoOpenPacks: enabled } } }
-                                  : { twitchExtensions: { fortnite: { allowTakeovers: enabled } } },
-                                { tickAfterSave: true, tickAfterSavePlatforms: ["twitch"] },
-                              )
-                            }
-                            onSetup={() =>
-                              adapter.openLink(
-                                "https://help.twitch.tv/s/article/how-to-configure-extensions",
-                              )
-                            }
-                            onChangeOrder={() =>
-                              changeView("settings", "twitch.watchSourcePriority")
-                            }
-                          />
-                        ) : criticalFailureReason ? (
-                          // A flagged platform loses its lists entirely: every drops
-                          // view would be lying about what is being farmed.
-                          <CriticalFailurePanel
-                            platform={platform}
-                            reason={criticalFailureReason}
-                            buildReport={() =>
-                              buildFailureReport({
-                                platform,
-                                version: adapter.version,
-                                userAgent:
-                                  typeof navigator === "undefined"
-                                    ? "unknown"
-                                    : navigator.userAgent,
-                                locale,
-                                at: new Date().toISOString(),
-                                settings,
-                                state: snapshot.state,
-                                events:
-                                  reportEvents.length > 0 ? reportEvents : activityStream.events,
-                              })
-                            }
-                            onDismiss={() => {
-                              void adapter
-                                .send({ type: "dismissCriticalFailure", platform })
-                                .then(() => refreshNow())
-                                .catch(() => undefined);
-                            }}
-                            openLink={adapter.openLink}
-                            writeClipboard={adapter.writeClipboard ?? (async () => false)}
-                          />
-                        ) : view === "completed" ? (
-                          <CompletedPanel
-                            campaigns={campaigns}
-                            gameMap={gameMap}
-                            focus={campaignFocus}
-                            refreshing={refreshing}
-                            onRefreshCampaign={() => refreshNow()}
-                          />
-                        ) : (
-                          <>
-                            {settings.showTips ? (
-                              <TipsBanner
-                                initialIndex={preview ? 0 : undefined}
-                                preview={preview}
+                        <div className="space-y-3">
+                          <AnimatePresence initial={false}>
+                            {noticeSlot === "update" && updateNotice ? (
+                              <UpdateNotice
+                                key="update-notice"
+                                version={updateNotice.version}
+                                href={updateNotice.href}
+                                onDismiss={dismissUpdateNotice}
                               />
                             ) : null}
-                            <QueuePanel
+                            {noticeSlot === "rate" ? (
+                              <RateNudge
+                                key="rate-nudge"
+                                onRate={() => void updateSettings({ rateNudgeStatus: "rated" })}
+                                onDismiss={() =>
+                                  void updateSettings({ rateNudgeStatus: "dismissed" })
+                                }
+                              />
+                            ) : null}
+                            {noticeSlot === "github-star" ? (
+                              <GithubStarNudge
+                                key="github-star-nudge"
+                                onStar={() =>
+                                  void updateSettings({ githubStarNudgeStatus: "starred" })
+                                }
+                                onDismiss={() =>
+                                  void updateSettings({ githubStarNudgeStatus: "dismissed" })
+                                }
+                              />
+                            ) : null}
+                          </AnimatePresence>
+                          {view === "settings" ? (
+                            <SettingsView
+                              suggestions={dropCategorySuggestions}
+                              onSearchCategories={searchCategories}
+                              settings={settings}
+                              onSettingsChange={updateSettings}
+                              onExtensionEnabledChange={
+                                adapter.requestTwitchExtensionPermission
+                                  ? setExtensionEnabled
+                                  : undefined
+                              }
+                              onExportCredentials={exportCredentials}
+                              onExportSettings={exportSettings}
+                              onImportSettings={importSettings}
+                              onReset={resetExtension}
+                              exportConfirmationResetKey={settingsOpenGeneration}
+                              compatibilityRegistry={adapter.compatibilityRegistry}
+                              compatibilityResolution={compatibilityResolution}
+                              onOpenGames={(gamesPlatform) => {
+                                if (gamesPlatform !== platform) selectPlatform(gamesPlatform);
+                                changeView("games");
+                              }}
+                              version={adapter.version}
+                              focusGroupId={
+                                preview
+                                && variantShowsPopup(initialVariant)
+                                && initialVariant.view === "settings"
+                                  ? "general.drops"
+                                  : settingsFocus
+                              }
+                              showSubscriptionChoice={subscriptionChoice}
+                            />
+                          ) : view === "activity" ? (
+                            <ActivityLog
+                              activityEvents={activityStream.events}
+                              diagnosticEvents={diagnosticStream.events}
+                              platform={platform}
+                              lastTickAt={snapshot.state.lastTickAt}
+                              diagnosticLogging={settings.diagnosticLogging}
+                              showDiagnostics={showDiagnostics}
+                              hasMore={Boolean(
+                                showDiagnostics
+                                  ? diagnosticStream.nextCursor
+                                  : activityStream.nextCursor,
+                              )}
+                              clearArmed={clearActivityArmed}
+                              clearFailed={clearActivityFailed}
+                              loadingMore={loadingMoreActivity}
+                              clearing={clearingActivity}
+                              version={adapter.version}
+                              locale={locale}
+                              searchQuery={diagnosticSearchQuery}
+                              onSearchQueryChange={setDiagnosticSearchQuery}
+                              searchingDiagnostics={Boolean(trimmedDiagnosticSearchQuery)}
+                              onShowDiagnosticsChange={handleShowDiagnosticsChange}
+                              onLoadMore={loadMoreActivity}
+                              onClear={clearActivityHistory}
+                              writeClipboard={adapter.writeClipboard}
+                              onExportAll={adapter.downloadFile ? exportDiagnosticsLog : undefined}
+                            />
+                          ) : view === "games" ? (
+                            // Keyed by platform so a search typed on one platform, and
+                            // the results it found, cannot be added to the other's lists.
+                            <GamesPanel
+                              key={platform}
+                              platform={platform}
+                              settings={settings}
+                              suggestions={dropCategorySuggestions[platform]}
+                              campaignCounts={gameCampaignCounts}
+                              onCategoryModeChange={(categoryMode) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { categoryMode } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                              onCategoriesChange={(categories) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { categories } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                              onFavouritesChange={(favouriteCategories) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { favouriteCategories } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                              onBlockedChange={(blockedCategories) =>
+                                void updateSettings(
+                                  { platform: { [platform]: { blockedCategories } } },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                              onSearchCategories={(query) => searchCategories(platform, query)}
+                            />
+                          ) : view === "watchlist" ? (
+                            // Keyed by platform so a half-typed channel cannot survive a
+                            // platform switch and land in the other platform's list.
+                            <IdleWatchlistPanel
+                              key={platform}
+                              platform={platform}
+                              streamers={screenshotWatchlist}
+                              watchOrder={settings.platform[platform].watchSourcePriority}
+                              onChangeOrder={() =>
+                                changeView("settings", `${platform}.watchSourcePriority`)
+                              }
+                              onChange={(ordered) =>
+                                updateSettings(
+                                  {
+                                    platform: {
+                                      [platform]: {
+                                        idleWatchlistChannels: ordered.map(
+                                          (streamer) => streamer.id,
+                                        ),
+                                      },
+                                    },
+                                  },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                )
+                              }
+                            />
+                          ) : view === "nopixel" || view === "fortnite" ? (
+                            <TwitchExtensionView
+                              providerId={view}
+                              settings={settings}
+                              summary={snapshot.state.twitchExtensions?.[view]}
+                              chatPresence={snapshot.state.chatPresence?.twitch}
+                              active={
+                                snapshot.state.sessions.twitch.status === "watching"
+                                && snapshot.state.sessions.twitch.watchMode === "tabless"
+                                && snapshot.state.sessions.twitch.supplementalWatch?.id === view
+                              }
+                              pending={extensionPending}
+                              onEnabledChange={(enabled) => changeExtensionEnabled(view, enabled)}
+                              onOptionChange={(enabled) =>
+                                void updateSettings(
+                                  view === "nopixel"
+                                    ? { twitchExtensions: { nopixel: { autoOpenPacks: enabled } } }
+                                    : {
+                                        twitchExtensions: { fortnite: { allowTakeovers: enabled } },
+                                      },
+                                  { tickAfterSave: true, tickAfterSavePlatforms: ["twitch"] },
+                                )
+                              }
+                              onSetup={() =>
+                                adapter.openLink(
+                                  "https://help.twitch.tv/s/article/how-to-configure-extensions",
+                                )
+                              }
+                              onChangeOrder={() =>
+                                changeView("settings", "twitch.watchSourcePriority")
+                              }
+                            />
+                          ) : criticalFailureReason ? (
+                            // A flagged platform loses its lists entirely: every drops
+                            // view would be lying about what is being farmed.
+                            <CriticalFailurePanel
+                              platform={platform}
+                              reason={criticalFailureReason}
+                              buildReport={() =>
+                                buildFailureReport({
+                                  platform,
+                                  version: adapter.version,
+                                  userAgent:
+                                    typeof navigator === "undefined"
+                                      ? "unknown"
+                                      : navigator.userAgent,
+                                  locale,
+                                  at: new Date().toISOString(),
+                                  settings,
+                                  state: snapshot.state,
+                                  events:
+                                    reportEvents.length > 0 ? reportEvents : activityStream.events,
+                                })
+                              }
+                              onDismiss={() => {
+                                void adapter
+                                  .send({ type: "dismissCriticalFailure", platform })
+                                  .then(() => refreshNow())
+                                  .catch(() => undefined);
+                              }}
+                              openLink={adapter.openLink}
+                              writeClipboard={adapter.writeClipboard ?? (async () => false)}
+                            />
+                          ) : view === "completed" ? (
+                            <CompletedPanel
                               campaigns={campaigns}
                               gameMap={gameMap}
                               focus={campaignFocus}
                               refreshing={refreshing}
-                              strategy={settings.priorityMode}
-                              pinnedCount={settings.campaignPins.length}
-                              farmPinnedOnly={settings.platform[platform].farmPinnedOnly}
-                              unlinkedCampaigns={settings.platform[platform].unlinkedCampaigns}
-                              platform={platform}
-                              rewardFilter={settings.platform[platform].rewardFilter}
-                              rewardKindCounts={rewardKindCounts}
-                              showSubscriptionChoice={subscriptionChoice[platform]}
-                              onRewardFilterChange={(rewardFilter) =>
-                                void updateSettings(
-                                  { platform: { [platform]: { rewardFilter } } },
-                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                                )
-                              }
-                              onStrategyChange={(priorityMode) =>
-                                void updateSettings({ priorityMode }, { tickAfterSave: true })
-                              }
-                              onUnpinAll={() =>
-                                void updateSettings({ campaignPins: [] }, { tickAfterSave: true })
-                              }
-                              onFarmPinnedOnlyChange={(farmPinnedOnly) =>
-                                void updateSettings(
-                                  { platform: { [platform]: { farmPinnedOnly } } },
-                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                                )
-                              }
-                              onUnlinkedCampaignsChange={(unlinkedCampaigns) =>
-                                void updateSettings(
-                                  { platform: { [platform]: { unlinkedCampaigns } } },
-                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                                )
-                              }
                               onRefreshCampaign={() => refreshNow()}
-                              onPinChange={(campaignId, position) =>
-                                updateSettings(
-                                  {
-                                    campaignPins:
-                                      position == null
-                                        ? unpinCampaign(settings.campaignPins, campaignId)
-                                        : pinCampaignAt(
-                                            settings.campaignPins,
-                                            campaignId,
-                                            position,
-                                          ),
-                                  },
-                                  { tickAfterSave: true },
-                                )
-                              }
-                              onToggleExclude={(id) => {
-                                const next = new Set(settings.excludedCampaignIds);
-                                if (next.has(id)) next.delete(id);
-                                else next.add(id);
-                                return updateSettings(
-                                  { excludedCampaignIds: [...next] },
-                                  { tickAfterSave: true },
-                                );
-                              }}
-                              onToggleFavouriteCategory={(category) =>
-                                updateSettings(
-                                  {
-                                    platform: {
-                                      [platform]: favouriteTogglePatch(
-                                        settings.platform[platform],
-                                        category,
-                                      ),
-                                    },
-                                  },
-                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                                )
-                              }
-                              onToggleBlockedCategory={(category) =>
-                                updateSettings(
-                                  {
-                                    platform: {
-                                      [platform]: blockTogglePatch(
-                                        settings.platform[platform],
-                                        category,
-                                      ),
-                                    },
-                                  },
-                                  { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
-                                )
-                              }
-                              onOpenGames={() => changeView("games")}
-                              onOpenSettings={(groupId) => changeView("settings", groupId)}
                             />
-                          </>
-                        )}
+                          ) : (
+                            <>
+                              {settings.showTips ? (
+                                <TipsBanner
+                                  initialIndex={preview ? 0 : undefined}
+                                  preview={preview}
+                                />
+                              ) : null}
+                              <QueuePanel
+                                campaigns={campaigns}
+                                gameMap={gameMap}
+                                focus={campaignFocus}
+                                refreshing={refreshing}
+                                strategy={settings.priorityMode}
+                                pinnedCount={settings.campaignPins.length}
+                                farmPinnedOnly={settings.platform[platform].farmPinnedOnly}
+                                unlinkedCampaigns={settings.platform[platform].unlinkedCampaigns}
+                                platform={platform}
+                                rewardFilter={settings.platform[platform].rewardFilter}
+                                rewardKindCounts={rewardKindCounts}
+                                showSubscriptionChoice={subscriptionChoice[platform]}
+                                onRewardFilterChange={(rewardFilter) =>
+                                  void updateSettings(
+                                    { platform: { [platform]: { rewardFilter } } },
+                                    { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                  )
+                                }
+                                onStrategyChange={(priorityMode) =>
+                                  void updateSettings({ priorityMode }, { tickAfterSave: true })
+                                }
+                                onUnpinAll={() =>
+                                  void updateSettings({ campaignPins: [] }, { tickAfterSave: true })
+                                }
+                                onFarmPinnedOnlyChange={(farmPinnedOnly) =>
+                                  void updateSettings(
+                                    { platform: { [platform]: { farmPinnedOnly } } },
+                                    { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                  )
+                                }
+                                onUnlinkedCampaignsChange={(unlinkedCampaigns) =>
+                                  void updateSettings(
+                                    { platform: { [platform]: { unlinkedCampaigns } } },
+                                    { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                  )
+                                }
+                                onRefreshCampaign={() => refreshNow()}
+                                onPinChange={(campaignId, position) =>
+                                  updateSettings(
+                                    {
+                                      campaignPins:
+                                        position == null
+                                          ? unpinCampaign(settings.campaignPins, campaignId)
+                                          : pinCampaignAt(
+                                              settings.campaignPins,
+                                              campaignId,
+                                              position,
+                                            ),
+                                    },
+                                    { tickAfterSave: true },
+                                  )
+                                }
+                                onToggleExclude={(id) => {
+                                  const next = new Set(settings.excludedCampaignIds);
+                                  if (next.has(id)) next.delete(id);
+                                  else next.add(id);
+                                  return updateSettings(
+                                    { excludedCampaignIds: [...next] },
+                                    { tickAfterSave: true },
+                                  );
+                                }}
+                                onToggleFavouriteCategory={(category) =>
+                                  updateSettings(
+                                    {
+                                      platform: {
+                                        [platform]: favouriteTogglePatch(
+                                          settings.platform[platform],
+                                          category,
+                                        ),
+                                      },
+                                    },
+                                    { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                  )
+                                }
+                                onToggleBlockedCategory={(category) =>
+                                  updateSettings(
+                                    {
+                                      platform: {
+                                        [platform]: blockTogglePatch(
+                                          settings.platform[platform],
+                                          category,
+                                        ),
+                                      },
+                                    },
+                                    { tickAfterSave: true, tickAfterSavePlatforms: [platform] },
+                                  )
+                                }
+                                onOpenGames={() => changeView("games")}
+                                onOpenSettings={(groupId) => changeView("settings", groupId)}
+                              />
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </ViewToolbarSlotContext.Provider>
-              </div>
-            </TooltipScope>
+                  </ViewToolbarSlotContext.Provider>
+                </div>
+              </TooltipScope>
+            </InertDuringTour>
+            {tour?.overlay}
           </main>
         </SubscriptionMarkContext.Provider>
       </I18nContext.Provider>

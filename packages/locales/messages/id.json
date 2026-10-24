@@ -90,7 +90,7 @@
     "message": "Game"
   },
   "navIdleWatchlist": {
-    "message": "Idle Watchlist"
+    "message": "Daftar cadangan"
   },
   "navActivity": {
     "message": "Aktivitas"
@@ -285,7 +285,7 @@
     "message": "Tampilan Game menentukan game mana yang di-farm, mana yang diutamakan, dan mana yang tidak pernah di-farm."
   },
   "tipIdleWatchlist": {
-    "message": "Atur kapan saluran Idle Watchlist ditonton dengan mengubah prioritas sumber tontonan di pengaturan platform."
+    "message": "Atur kapan saluran daftar cadangan ditonton dengan mengubah prioritas sumber tontonan di pengaturan platform."
   },
   "tipTablessMode": {
     "message": "Mode tanpa tab memakai lebih sedikit sumber daya dan beralih ke tab bisu jika diperlukan."
@@ -310,6 +310,114 @@
   },
   "tipTranslationsAction": {
     "message": "Baca panduan terjemahan"
+  },
+  "tourWelcomeTitle": {
+    "message": "Selamat datang di Lurkloot"
+  },
+  "tourWelcomeBody": {
+    "message": "Lurkloot memfarm drop Twitch dan Kick untuk Anda di latar belakang. Mau lihat sekilas cara kerjanya? Tips: gunakan tombol panah untuk berpindah di tur ini."
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "Baru di Lurkloot: tur singkat"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "Lihat dalam waktu kurang dari semenit apa yang baru dan mungkin terlewat. Tips: gunakan tombol panah untuk berpindah di tur ini."
+  },
+  "tourStart": {
+    "message": "Tunjukkan"
+  },
+  "tourSkip": {
+    "message": "Lewati"
+  },
+  "tourNext": {
+    "message": "Berikutnya"
+  },
+  "tourBack": {
+    "message": "Kembali"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "Selalu terlihat"
+  },
+  "tourStatusStripBody": {
+    "message": "Bilah ini menampilkan apa yang sedang di-farm dan di saluran mana. Sakelar memulai atau menghentikan farming di platform ini."
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch dan Kick"
+  },
+  "tourPlatformBody": {
+    "message": "Ganti platform di sini. Masing-masing punya antrean, game, dan watchlist sendiri."
+  },
+  "tourQueueOrderTitle": {
+    "message": "Cara antrean diurutkan"
+  },
+  "tourQueueOrderBody": {
+    "message": "Kampanye yang disematkan tampil pertama, lalu game favorit, lalu sisanya sesuai urutan yang Anda pilih di bawah \"Lalu menurut\". Klik sebuah kampanye untuk membukanya dan melihat hadiah serta progresnya, atau untuk menyematkan atau mengecualikannya."
+  },
+  "tourRewardFilterTitle": {
+    "message": "Pilih yang akan di-farm"
+  },
+  "tourRewardFilterBody": {
+    "message": "Buka \"Semua hadiah\" untuk memilih jenis hadiah yang di-farm, apa yang dilakukan pada kampanye tanpa akun tertaut, dan apakah hanya kampanye yang disematkan yang di-farm."
+  },
+  "tourCompletedTitle": {
+    "message": "Selesai dan kedaluwarsa"
+  },
+  "tourCompletedBody": {
+    "message": "Kampanye yang selesai sudah mengklaim semua hadiahnya. Yang kedaluwarsa berakhir sebelum sempat diselesaikan."
+  },
+  "tourGamesTitle": {
+    "message": "Pilih game Anda"
+  },
+  "tourGamesBody": {
+    "message": "Pilih \"Semua kategori\" untuk memfarm setiap game kecuali yang Anda blokir, atau \"Hanya yang dipilih\" untuk memfarm hanya game yang Anda centang. Beri bintang pada game agar kampanyenya tampil lebih dulu, atau blokir agar tidak pernah di-farm."
+  },
+  "tourWatchlistTitle": {
+    "message": "Daftar cadangan"
+  },
+  "tourWatchlistBody": {
+    "message": "Saat tidak ada drop untuk di-farm, Lurkloot menonton saluran ini agar Anda terus mendapat poin saluran di Twitch, serta hadiah harian dan streak tonton di Kick. Prioritas sumber tontonan di Pengaturan menentukan kapan saluran ditonton."
+  },
+  "tourExtensionsTitle": {
+    "message": "Ekstensi Twitch"
+  },
+  "tourExtensionsBody": {
+    "message": "Beberapa game membagikan hadiah lewat Ekstensi Twitch, seperti NoPixel dan Fortnite. Aktifkan masing-masing untuk memfarm hadiah itu juga."
+  },
+  "tourKickProgressTitle": {
+    "message": "Level Kick Anda"
+  },
+  "tourKickProgressBody": {
+    "message": "Di Kick, pil ini menampilkan level penonton Anda, seberapa dekat ke level berikutnya, dan rentetan tontonan harian Anda."
+  },
+  "tourKickChallengesTitle": {
+    "message": "Tantangan harian"
+  },
+  "tourKickChallengesBody": {
+    "message": "Lurkloot bisa mengklaim hadiah tantangan harian Kick untuk Anda. Aktifkan atau nonaktifkan di sini."
+  },
+  "tourActivityTitle": {
+    "message": "Apa yang dilakukan Lurkloot"
+  },
+  "tourActivityBody": {
+    "message": "Aktivitas mencatat setiap klaim, pergantian saluran, dan kampanye yang selesai, supaya Anda bisa melihat apa yang terjadi saat Anda pergi."
+  },
+  "tourSettingsTitle": {
+    "message": "Pengaturan yang berguna"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot sangat bisa dikonfigurasi dan tersedia dalam 17 bahasa. Gunakan kolom pencarian untuk menemukan pengaturan tertentu. Di sini juga Anda bisa mereset Lurkloot, atau mengekspor dan mengimpor pengaturan untuk dibagikan antarkomputer dan browser."
+  },
+  "tourDoneTitle": {
+    "message": "Siap! Mari farm drop ini!"
+  },
+  "tourDoneBody": {
+    "message": "Masuk ke Twitch atau Kick lewat situs resminya di browser ini. Lurkloot tidak pernah meminta kredensial Anda. Lalu aktifkan platform yang ingin Anda farm (atau keduanya)."
+  },
+  "tourFinish": {
+    "message": "Ayo mulai!"
   },
   "noCampaigns": {
     "message": "Belum ada kampanye yang ditemukan."
@@ -498,7 +606,7 @@
     "message": "Kecualikan dari farming"
   },
   "noIdleWatchlist": {
-    "message": "Tidak ada saluran idle watchlist yang dikonfigurasi."
+    "message": "Tidak ada saluran daftar cadangan yang dikonfigurasi."
   },
   "channelPlaceholder": {
     "message": "saluran"
@@ -594,10 +702,10 @@
     "message": "Saluran cadangan saat tidak ada drop yang memenuhi syarat."
   },
   "preferKnownChannelsTitle": {
-    "message": "Utamakan saluran yang diikuti dan Idle Watchlist"
+    "message": "Utamakan saluran yang diikuti dan daftar cadangan"
   },
   "preferKnownChannelsDescription": {
-    "message": "Saat drop tersedia di beberapa saluran, pilih yang Anda ikuti atau ada di Idle Watchlist, bukan yang asing."
+    "message": "Saat drop tersedia di beberapa saluran, pilih yang Anda ikuti atau ada di daftar cadangan, bukan yang asing."
   },
   "platformSettingsTitle": {
     "message": "Pengaturan platform"
@@ -651,7 +759,7 @@
     "message": "Bisukan tab farming"
   },
   "muteTabsDescription": {
-    "message": "Biarkan tab drop dan Idle Watchlist bisu saat farming."
+    "message": "Biarkan tab drop dan daftar cadangan bisu saat farming."
   },
   "keepVideosUnmutedTitle": {
     "message": "Biarkan video farming tidak bisu"
@@ -822,13 +930,13 @@
     "message": "Otomatisasi"
   },
   "farmOnPlatform": {
-    "message": "Farm drop dan tonton saluran Idle Watchlist di $1."
+    "message": "Farm drop dan tonton saluran daftar cadangan di $1."
   },
   "enabled": {
     "message": "Diaktifkan"
   },
   "idleWatchlistEditHint": {
-    "message": "Edit dari tab Idle Watchlist setelah memilih $1."
+    "message": "Edit dari tab Daftar cadangan setelah memilih $1."
   },
   "autoClaimChannelPointsTitle": {
     "message": "Klaim channel points otomatis"
@@ -1104,7 +1212,7 @@
     "message": "Lebih dari drop."
   },
   "screenshotExtrasSubcopy": {
-    "message": "Channel points, tantangan Kick, dan drop 2 menit — juga diklaim untuk Anda. Idle watchlist saat tidak ada yang perlu di-farm."
+    "message": "Channel points, tantangan Kick, dan drop 2 menit — juga diklaim untuk Anda. Daftar cadangan saat tidak ada yang perlu di-farm."
   },
   "screenshotExtrasPointsName": {
     "message": "Poin channel"
@@ -1119,7 +1227,7 @@
     "message": "Kick · juga diklaim untuk Anda"
   },
   "screenshotExtrasWatchlistName": {
-    "message": "Daftar tontonan idle"
+    "message": "Daftar cadangan"
   },
   "screenshotExtrasWatchlistMeta": {
     "message": "Menonton streamer Anda di antara kampanye"
@@ -1446,7 +1554,7 @@
     "message": "hadiah prioritas lebih tinggi mengambil alih"
   },
   "activityReasonHigherPriorityIdleWatchlist": {
-    "message": "saluran Idle Watchlist prioritas lebih tinggi tersedia"
+    "message": "saluran daftar cadangan prioritas lebih tinggi tersedia"
   },
   "activityReasonWatchRequirementCompleted": {
     "message": "persyaratan tonton selesai"
@@ -1866,10 +1974,10 @@
     "message": "Buka Lurkloot"
   },
   "inPageAddToWatchlist": {
-    "message": "Tambahkan $1 ke idle watchlist"
+    "message": "Tambahkan $1 ke daftar cadangan"
   },
   "inPageRemoveFromWatchlist": {
-    "message": "Hapus $1 dari idle watchlist"
+    "message": "Hapus $1 dari daftar cadangan"
   },
   "navNoPixel": {
     "message": "NoPixel V"

@@ -372,7 +372,7 @@ export function QueuePanel({
           </div>
         )
       ) : (
-        <div ref={listRef} className="space-y-1">
+        <div ref={listRef} data-tour="queue-list" className="space-y-1">
           {tiers.map((tier) => {
             const rows = queued.filter((campaign) => campaign.rankTier === tier);
             if (rows.length === 0) return null;

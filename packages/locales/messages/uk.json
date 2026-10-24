@@ -90,7 +90,7 @@
     "message": "Ігри"
   },
   "navIdleWatchlist": {
-    "message": "Idle Watchlist"
+    "message": "Резервний список"
   },
   "navActivity": {
     "message": "Активність"
@@ -285,7 +285,7 @@
     "message": "Вкладка «Ігри» визначає, які ігри фармляться, які йдуть першими та які ніколи не фармляться."
   },
   "tipIdleWatchlist": {
-    "message": "Оберіть, коли дивитися канали Idle Watchlist, змінивши пріоритет джерел перегляду в налаштуваннях платформи."
+    "message": "Оберіть, коли дивитися канали резервного списку, змінивши пріоритет джерел перегляду в налаштуваннях платформи."
   },
   "tipTablessMode": {
     "message": "Режим без вкладок споживає менше ресурсів і за потреби перемикається на вкладку без звуку."
@@ -310,6 +310,114 @@
   },
   "tipTranslationsAction": {
     "message": "Читати посібник з перекладу"
+  },
+  "tourWelcomeTitle": {
+    "message": "Ласкаво просимо до Lurkloot"
+  },
+  "tourWelcomeBody": {
+    "message": "Lurkloot фармить drops Twitch і Kick за вас у фоновому режимі. Хочете коротко дізнатися, як це працює? Порада: клавішами зі стрілками можна переміщатися по турі."
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "Новини в Lurkloot: короткий тур"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "За хвилину дізнайтеся, що нового і що ви могли пропустити. Порада: клавішами зі стрілками можна переміщатися по турі."
+  },
+  "tourStart": {
+    "message": "Покажіть усе"
+  },
+  "tourSkip": {
+    "message": "Пропустити"
+  },
+  "tourNext": {
+    "message": "Далі"
+  },
+  "tourBack": {
+    "message": "Назад"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "Завжди на виду"
+  },
+  "tourStatusStripBody": {
+    "message": "Тут видно, що зараз фармиться і на якому каналі. Перемикач запускає або зупиняє фарм на цій платформі."
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch і Kick"
+  },
+  "tourPlatformBody": {
+    "message": "Перемикайте платформи тут. Кожна має власну чергу, ігри та резервний список."
+  },
+  "tourQueueOrderTitle": {
+    "message": "Як упорядковано чергу"
+  },
+  "tourQueueOrderBody": {
+    "message": "Спочатку закріплені кампанії, потім улюблені ігри, а далі все інше в порядку, який ви оберете в пункті «Потім за». Натисніть на кампанію, щоб розгорнути її нагороди та прогрес, або щоб закріпити її чи виключити."
+  },
+  "tourRewardFilterTitle": {
+    "message": "Оберіть, що фармити"
+  },
+  "tourRewardFilterBody": {
+    "message": "Відкрийте «Усі нагороди», щоб вибрати типи нагород для фарму, що робити з кампаніями без прив’язаного облікового запису і чи фармити лише закріплені кампанії."
+  },
+  "tourCompletedTitle": {
+    "message": "Завершені й минулі"
+  },
+  "tourCompletedBody": {
+    "message": "У завершених кампаніях отримано всі нагороди. Минулі закінчилися раніше, ніж їх вдалося виконати."
+  },
+  "tourGamesTitle": {
+    "message": "Оберіть ігри"
+  },
+  "tourGamesBody": {
+    "message": "Оберіть «Усі категорії», щоб фармити всі ігри, крім заблокованих, або «Лише обрані», щоб фармити лише позначені. Позначте гру зіркою, щоб її кампанії були першими, або заблокуйте її, щоб її ніколи не фармили."
+  },
+  "tourWatchlistTitle": {
+    "message": "Резервний список"
+  },
+  "tourWatchlistBody": {
+    "message": "Коли дропів для фарму немає, Lurkloot дивиться ці канали, щоб ви й далі отримували бали каналу на Twitch, а щоденні нагороди та серію перегляду на Kick. Пріоритет джерел перегляду в налаштуваннях визначає, коли їх дивитися."
+  },
+  "tourExtensionsTitle": {
+    "message": "Розширення Twitch"
+  },
+  "tourExtensionsBody": {
+    "message": "Деякі ігри видають нагороди через розширення Twitch, наприклад NoPixel і Fortnite. Увімкніть кожне, щоб фармити й ці нагороди."
+  },
+  "tourKickProgressTitle": {
+    "message": "Ваш рівень на Kick"
+  },
+  "tourKickProgressBody": {
+    "message": "На Kick ця кнопка показує ваш рівень глядача, скільки лишилось до наступного та серію щоденного перегляду."
+  },
+  "tourKickChallengesTitle": {
+    "message": "Щоденні виклики"
+  },
+  "tourKickChallengesBody": {
+    "message": "Lurkloot може забирати для вас нагороди за щоденні виклики Kick. Увімкнути або вимкнути це можна тут."
+  },
+  "tourActivityTitle": {
+    "message": "Що зробив Lurkloot"
+  },
+  "tourActivityBody": {
+    "message": "«Активність» показує кожне отримання нагороди, перемикання каналів і завершену кампанію, щоб ви бачили, що сталося, поки вас не було."
+  },
+  "tourSettingsTitle": {
+    "message": "Корисні налаштування"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot дуже гнучко налаштовується та доступний 17 мовами. Щоб знайти потрібне налаштування, скористайтеся рядком пошуку. Тут також можна скинути Lurkloot або експортувати й імпортувати налаштування, щоб поділитися ними між комп'ютерами та браузерами."
+  },
+  "tourDoneTitle": {
+    "message": "Все готово! Час фармити ці drops!"
+  },
+  "tourDoneBody": {
+    "message": "Увійдіть у Twitch або Kick на їхніх офіційних сайтах у цьому браузері. Lurkloot ніколи не просить ваші облікові дані. Потім увімкніть платформу, на якій хочете фармити (або обидві)."
+  },
+  "tourFinish": {
+    "message": "Поїхали!"
   },
   "noCampaigns": {
     "message": "Кампаній поки не знайдено."
@@ -498,7 +606,7 @@
     "message": "Виключити з фарму"
   },
   "noIdleWatchlist": {
-    "message": "Канали Idle Watchlist не налаштовані."
+    "message": "Канали резервного списку не налаштовані."
   },
   "channelPlaceholder": {
     "message": "канал"
@@ -594,10 +702,10 @@
     "message": "Резервні канали, коли немає доступних дропів."
   },
   "preferKnownChannelsTitle": {
-    "message": "Надавати перевагу підписаним каналам і Idle Watchlist"
+    "message": "Надавати перевагу підписаним каналам і каналам резервного списку"
   },
   "preferKnownChannelsDescription": {
-    "message": "Коли дроп доступний на кількох каналах, обирає той, на який ви підписані або який у Idle Watchlist, а не незнайомий."
+    "message": "Коли дроп доступний на кількох каналах, обирає той, на який ви підписані або який у резервному списку, а не незнайомий."
   },
   "platformSettingsTitle": {
     "message": "Налаштування платформи"
@@ -651,7 +759,7 @@
     "message": "Вимкнути звук вкладок фарму"
   },
   "muteTabsDescription": {
-    "message": "Тримає вкладки drops і Idle Watchlist без звуку під час фарму."
+    "message": "Тримає вкладки drops і вкладки резервного списку без звуку під час фарму."
   },
   "keepVideosUnmutedTitle": {
     "message": "Не вимикати звук відео фарму"
@@ -822,13 +930,13 @@
     "message": "Автоматизація"
   },
   "farmOnPlatform": {
-    "message": "Фармить дропи та дивиться канали Idle Watchlist на $1."
+    "message": "Фармить дропи та дивиться канали резервного списку на $1."
   },
   "enabled": {
     "message": "Увімкнено"
   },
   "idleWatchlistEditHint": {
-    "message": "Редагуйте їх на вкладці Idle Watchlist після вибору $1."
+    "message": "Редагуйте їх на вкладці «Резервний список» після вибору $1."
   },
   "autoClaimChannelPointsTitle": {
     "message": "Автозабір балів каналу"
@@ -1104,7 +1212,7 @@
     "message": "Більше, ніж дропи."
   },
   "screenshotExtrasSubcopy": {
-    "message": "Бали каналу, виклики Kick і 2-хвилинні дропи — теж забираються за вас. Idle Watchlist, коли фармити більше нічого."
+    "message": "Бали каналу, виклики Kick і 2-хвилинні дропи — теж забираються за вас. Резервний список, коли фармити більше нічого."
   },
   "screenshotExtrasPointsName": {
     "message": "Бали каналу"
@@ -1119,7 +1227,7 @@
     "message": "Kick · теж забирається за вас"
   },
   "screenshotExtrasWatchlistName": {
-    "message": "Idle Watchlist"
+    "message": "Резервний список"
   },
   "screenshotExtrasWatchlistMeta": {
     "message": "Дивиться ваших стримерів між кампаніями"
@@ -1446,7 +1554,7 @@
     "message": "нагорода з вищим пріоритетом взяла верх"
   },
   "activityReasonHigherPriorityIdleWatchlist": {
-    "message": "канал Idle Watchlist з вищим пріоритетом став доступним"
+    "message": "канал резервного списку з вищим пріоритетом став доступним"
   },
   "activityReasonWatchRequirementCompleted": {
     "message": "вимогу перегляду виконано"
@@ -1866,10 +1974,10 @@
     "message": "Відкрити Lurkloot"
   },
   "inPageAddToWatchlist": {
-    "message": "Додати $1 до Idle Watchlist"
+    "message": "Додати $1 до резервного списку"
   },
   "inPageRemoveFromWatchlist": {
-    "message": "Прибрати $1 з Idle Watchlist"
+    "message": "Прибрати $1 з резервного списку"
   },
   "navNoPixel": {
     "message": "NoPixel V"
