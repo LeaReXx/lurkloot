@@ -998,6 +998,56 @@ rows by ranking tier, and Skipped rows carry the reason the engine gave plus the
 single action that resolves it. Changes that can affect the active scheduler
 target can request a targeted tick for the affected platform.
 
+### Onboarding tour
+
+A fresh install, and a first update for someone who was never offered it, shows
+a guided tour over the toolbar popup. Whether it is still owed is one
+`pendingOnboarding` value in `storage.local` (`"new"` or `"returning"`, the
+`OnboardingAudience` type from `@lurkloot/popup-ui`; anything else reads as
+none), owned by `packages/extension/src/core/onboarding.ts`. A second key,
+`onboardingOffered`, records that the tour has been armed for this profile.
+`armOnboardingForLifecycle(reason)` runs first in the `onInstalled` handler in
+`entrypoints/background.ts`: `install` sets `"new"` and the marker; `update`
+sets `"returning"` and the marker only when the marker is absent; every other
+reason (`chrome_update`, `shared_module_update`) does nothing. Both keys go in
+one `storage.local.set`. `resetStorage` writes `"new"` and the marker in the
+same `set` as the defaults, so a factory reset re-arms the tour as a new
+install and is never followed by a "returning" offer. Finishing or skipping
+the tour removes only `pendingOnboarding`; the marker stays, so an upgrader is
+offered the tour once. The returning audience differs only in the welcome
+card copy (`tourWelcomeReturning*`); steps and the done card are shared.
+
+The value is deliberately not an `ExtensionSettings` field. Settings are
+exported, imported and shared with the CLI, and settings normalization fills a
+missing field with its default, which does not fit a one-time offer.
+
+`PopupAdapter` exposes the flag through two optional hooks,
+`getPendingOnboarding` and `dismissPendingOnboarding`. Only the toolbar popup
+adapter (`entrypoints/popup/app.tsx`) implements them. The site demo, the
+screenshot and promo renderers and the in-page panel omit them, so the tour
+never appears there.
+
+`Popup` in `packages/popup-ui/src/Popup.tsx` is a thin wrapper that decides
+whether the tour runs. While it does, the wrapper mounts `PopupFrame` on a
+memoized `createDemoPopupAdapter({ scenario: "tour" })` in preview mode. The
+real adapter is never handed to the frame during the tour, so the tour cannot
+write real settings or send runtime messages. When the tour ends the real
+frame mounts fresh. The wrapper also wraps `resetExtension` so that a reset
+inside the popup brings the tour back immediately. The overlay is
+`onboardingTour.tsx`; the steps, reducer and placement maths are
+`onboardingTour.logic.ts`, and the frame elements the tour points at carry
+`data-tour` attributes. A step about a view names it as `railView`, and the
+overlay then lights that view's rail entry (`[data-tour="rail"]
+button[data-view=…]`) beside the main target: the frame is split at the rail's
+measured edge, each side drawing its own one-hole scrim, and the card is
+placed in `placementFrame`, the part of the frame beside the rail, so it never
+covers the rail's cut-out.
+
+`tests/onboarding.test.ts` and `tests/storageMigration.test.ts` guard the flag,
+`tests/onboardingTourLogic.test.ts` the steps and reducer,
+`tests/popupTourFrame.test.tsx` and `tests/onboardingTour.test.tsx` the frame
+and overlay, and `tests/popupDemoTour.test.ts` the demo scenario.
+
 ## Activity and diagnostics
 
 The controller emits causally ordered batches of typed activity and diagnostic records through a host-provided reporter. Farming starts, stops with a stable reason, successful claims, and actionable interruptions are activity; request, playback, tab, and scheduler detail is diagnostic. Unchanged periodic decisions are not emitted repeatedly. Hosts format and retain these records at that reporter boundary rather than reconstructing prose from scheduler state.

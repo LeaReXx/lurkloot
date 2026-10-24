@@ -311,6 +311,114 @@
   "tipTranslationsAction": {
     "message": "Przeczytaj przewodnik tłumaczeń"
   },
+  "tourWelcomeTitle": {
+    "message": "Witaj w Lurkloot"
+  },
+  "tourWelcomeBody": {
+    "message": "Lurkloot farmi dropy Twitcha i Kicka za Ciebie w tle. Chcesz szybko zobaczyć, jak to działa? Wskazówka: strzałkami możesz poruszać się po przewodniku."
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "Nowości w Lurkloot: szybki przewodnik"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "W mniej niż minutę sprawdź, co nowego i co mogło Ci umknąć. Wskazówka: strzałkami możesz poruszać się po przewodniku."
+  },
+  "tourStart": {
+    "message": "Pokaż mi, jak to działa"
+  },
+  "tourSkip": {
+    "message": "Pomiń"
+  },
+  "tourNext": {
+    "message": "Dalej"
+  },
+  "tourBack": {
+    "message": "Wstecz"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "Zawsze widoczne"
+  },
+  "tourStatusStripBody": {
+    "message": "Ten pasek pokazuje, co jest teraz farmione i na którym kanale. Przełącznik uruchamia lub zatrzymuje farmienie na tej platformie."
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch i Kick"
+  },
+  "tourPlatformBody": {
+    "message": "Przełączaj platformy tutaj. Każda ma własną kolejkę, gry i listę zapasową."
+  },
+  "tourQueueOrderTitle": {
+    "message": "Jak uporządkowana jest kolejka"
+  },
+  "tourQueueOrderBody": {
+    "message": "Najpierw idą przypięte kampanie, potem ulubione gry, a reszta w kolejności wybranej w „Następnie według”. Kliknij kampanię, aby ją rozwinąć i zobaczyć nagrody oraz postęp, albo aby ją przypiąć lub wykluczyć."
+  },
+  "tourRewardFilterTitle": {
+    "message": "Wybierz, co farmić"
+  },
+  "tourRewardFilterBody": {
+    "message": "Otwórz „Wszystkie nagrody”, aby wybrać typy nagród do farmienia, sposób postępowania z kampaniami bez połączonego konta oraz to, czy farmić wyłącznie przypięte kampanie."
+  },
+  "tourCompletedTitle": {
+    "message": "Ukończone i wygasłe"
+  },
+  "tourCompletedBody": {
+    "message": "Ukończone kampanie mają odebrane wszystkie nagrody. Wygasłe zakończyły się, zanim je ukończono."
+  },
+  "tourGamesTitle": {
+    "message": "Wybierz swoje gry"
+  },
+  "tourGamesBody": {
+    "message": "Wybierz „Wszystkie kategorie”, aby farmić każdą grę oprócz zablokowanych, lub „Tylko wybrane”, aby farmić wyłącznie zaznaczone gry. Oznacz grę gwiazdką, aby jej kampanie były na początku, albo ją zablokuj, aby nigdy nie była farmiona."
+  },
+  "tourWatchlistTitle": {
+    "message": "Lista zapasowa"
+  },
+  "tourWatchlistBody": {
+    "message": "Gdy nie ma dropów do farmienia, Lurkloot ogląda te kanały, abyś nadal zdobywał punkty kanału na Twitchu oraz codzienne nagrody i serię oglądania na Kicku. O tym, kiedy są oglądane, decyduje priorytet źródeł oglądania w Ustawieniach."
+  },
+  "tourExtensionsTitle": {
+    "message": "Rozszerzenia Twitcha"
+  },
+  "tourExtensionsBody": {
+    "message": "Niektóre gry, jak NoPixel i Fortnite, rozdają nagrody przez rozszerzenia Twitcha. Włącz każde z nich, aby farmić także te nagrody."
+  },
+  "tourKickProgressTitle": {
+    "message": "Twój poziom na Kicku"
+  },
+  "tourKickProgressBody": {
+    "message": "Na Kicku ta pigułka pokazuje Twój poziom widza, postęp do następnego poziomu i serię codziennego oglądania."
+  },
+  "tourKickChallengesTitle": {
+    "message": "Codzienne wyzwania"
+  },
+  "tourKickChallengesBody": {
+    "message": "Lurkloot może za Ciebie odbierać nagrody z codziennych wyzwań Kicka. Włącz lub wyłącz to tutaj."
+  },
+  "tourActivityTitle": {
+    "message": "Co zrobił Lurkloot"
+  },
+  "tourActivityBody": {
+    "message": "Aktywność zawiera listę wszystkich odebranych nagród, zmian kanałów i zakończonych kampanii, dzięki czemu widzisz, co działo się, gdy Cię nie było."
+  },
+  "tourSettingsTitle": {
+    "message": "Przydatne ustawienia"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot można bardzo szczegółowo dostosować, a jest dostępny w 17 językach. Pasek wyszukiwania pozwala szybko znaleźć konkretne ustawienie. Tutaj możesz też zresetować Lurkloot albo wyeksportować i zaimportować ustawienia, aby udostępnić je między komputerami i przeglądarkami."
+  },
+  "tourDoneTitle": {
+    "message": "Gotowe! Zabierajmy się za farmienie tych dropów!"
+  },
+  "tourDoneBody": {
+    "message": "Zaloguj się do Twitcha lub Kicka na ich oficjalnych stronach w tej przeglądarce. Lurkloot nigdy nie prosi o dane logowania. Następnie włącz platformę, na której chcesz farmić (lub obie)."
+  },
+  "tourFinish": {
+    "message": "Jazda!"
+  },
   "noCampaigns": {
     "message": "Nie wykryto jeszcze kampanii."
   },

@@ -311,6 +311,114 @@
   "tipTranslationsAction": {
     "message": "翻訳ガイドを読む"
   },
+  "tourWelcomeTitle": {
+    "message": "Lurkloot へようこそ"
+  },
+  "tourWelcomeBody": {
+    "message": "Lurkloot が Twitch と Kick の Drops をバックグラウンドでファームします。仕組みを簡単にご覧になりますか？ ヒント：矢印キーでツアーを移動できます。"
+  },
+  "tourWelcomeReturningTitle": {
+    "message": "Lurkloot の新機能: クイックツアー"
+  },
+  "tourWelcomeReturningBody": {
+    "message": "1分足らずで、新しい機能と見逃したかもしれない変更点をご確認いただけます。ヒント：矢印キーでツアーを移動できます。"
+  },
+  "tourStart": {
+    "message": "使い方を見る"
+  },
+  "tourSkip": {
+    "message": "スキップ"
+  },
+  "tourNext": {
+    "message": "次へ"
+  },
+  "tourBack": {
+    "message": "戻る"
+  },
+  "tourProgress": {
+    "message": "$1 / $2"
+  },
+  "tourStatusStripTitle": {
+    "message": "常に表示"
+  },
+  "tourStatusStripBody": {
+    "message": "この帯には、今ファームしている内容と配信チャンネルが表示されます。スイッチで、このプラットフォームのファームを開始または停止できます。"
+  },
+  "tourPlatformTitle": {
+    "message": "Twitch と Kick"
+  },
+  "tourPlatformBody": {
+    "message": "ここでプラットフォームを切り替えます。それぞれに独自のキュー、ゲーム、ウォッチリストがあります。"
+  },
+  "tourQueueOrderTitle": {
+    "message": "キューの並び順"
+  },
+  "tourQueueOrderBody": {
+    "message": "ピン留めしたキャンペーンが最初に来て、次にお気に入りのゲーム、その後は「次に」で選んだ基準に従ってそのほかのすべてが並びます。キャンペーンをクリックすると展開して報酬と進捗を確認したり、ピン留めや除外をしたりできます。"
+  },
+  "tourRewardFilterTitle": {
+    "message": "ファームする内容を選ぶ"
+  },
+  "tourRewardFilterBody": {
+    "message": "「すべての報酬」を開くと、ファームする報酬の種類、アカウント未連携のキャンペーンの扱い、ピン留めしたキャンペーンのみをファームするかどうかを選べます。"
+  },
+  "tourCompletedTitle": {
+    "message": "完了と期限切れ"
+  },
+  "tourCompletedBody": {
+    "message": "完了したキャンペーンは、すべての報酬を受け取り済みです。期限切れのキャンペーンは、完了する前に終了したものです。"
+  },
+  "tourGamesTitle": {
+    "message": "ゲームを選ぶ"
+  },
+  "tourGamesBody": {
+    "message": "「すべてのカテゴリ」を選ぶと、ブロックしたゲーム以外のすべてをファームします。「選択のみ」を選ぶと、チェックしたゲームだけをファームします。ゲームにスターを付けるとそのキャンペーンが先頭に来、ブロックするとそのゲームは決してファームされません。"
+  },
+  "tourWatchlistTitle": {
+    "message": "アイドル・ウォッチリスト"
+  },
+  "tourWatchlistBody": {
+    "message": "ファームできる Drops がないとき、Lurkloot はこれらのチャンネルを視聴し、Twitch ではチャンネルポイント、Kick では毎日の報酬と視聴ストリークを獲得し続けます。いつ視聴するかは、設定の視聴ソース優先度で決まります。"
+  },
+  "tourExtensionsTitle": {
+    "message": "Twitch エクステンション"
+  },
+  "tourExtensionsBody": {
+    "message": "NoPixel や Fortnite など一部のゲームは、Twitch エクステンションを通じて報酬を配布します。それぞれをオンにすると、それらの報酬もファームできます。"
+  },
+  "tourKickProgressTitle": {
+    "message": "Kick のレベル"
+  },
+  "tourKickProgressBody": {
+    "message": "Kick では、このピルに視聴レベル、次のレベルまでの進み具合、毎日の視聴連続記録が表示されます。"
+  },
+  "tourKickChallengesTitle": {
+    "message": "デイリーチャレンジ"
+  },
+  "tourKickChallengesBody": {
+    "message": "Lurkloot は Kick のデイリーチャレンジの報酬を代わりに受け取れます。ここでオンまたはオフに切り替えられます。"
+  },
+  "tourActivityTitle": {
+    "message": "Lurkloot の動き"
+  },
+  "tourActivityBody": {
+    "message": "アクティビティには、すべての報酬の受け取り、チャンネルの切り替え、完了したキャンペーンが記録されるので、離れている間に何が起きたかを確認できます。"
+  },
+  "tourSettingsTitle": {
+    "message": "便利な設定"
+  },
+  "tourSettingsBody": {
+    "message": "Lurkloot は細かく設定でき、17 の言語に対応しています。検索バーを使うと特定の設定をすぐに見つけられます。ここでは Lurkloot のリセットや、設定のエクスポートとインポートも行えるため、パソコンやブラウザ間で設定を共有できます。"
+  },
+  "tourDoneTitle": {
+    "message": "準備完了です！さあ、Drops をファームしましょう！"
+  },
+  "tourDoneBody": {
+    "message": "このブラウザで、Twitch または Kick の公式サイトにサインインしてください。Lurkloot があなたの認証情報を求めることはありません。その後、ファームしたいプラットフォーム（または両方）をオンにしてください。"
+  },
+  "tourFinish": {
+    "message": "さあ、始めよう！"
+  },
   "noCampaigns": {
     "message": "まだキャンペーンが見つかっていません。"
   },
