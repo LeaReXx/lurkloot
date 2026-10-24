@@ -10,7 +10,8 @@
         "kind": "fixed",
         "text": "Some Ukrainian, Korean, Indonesian and Japanese text, such as the Idle watchlist and Twitch extension labels, was still in English. It is now translated."
       }
-    ]
+    ],
+    "date": "2026-10-24"
   },
   {
     "version": "1.18.1",
